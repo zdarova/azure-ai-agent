@@ -97,6 +97,14 @@
             font-family: 'SF Mono', Consolas, monospace; margin-bottom: 0.5rem; letter-spacing: 0.3px;
         }
 
+        .reasoning-box {
+            margin-bottom: 0.5rem; padding: 0.4rem 0.7rem; background: #eff6ff;
+            border-radius: 6px; border-left: 3px solid #3b82f6; font-size: 0.75rem; color: #1e40af;
+            cursor: pointer; user-select: none;
+        }
+        .reasoning-box .label { font-weight: 600; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; }
+        .reasoning-box .text { margin-top: 0.2rem; font-style: italic; color: #1e3a5f; }
+
         /* Quality bar */
         .quality-bar {
             margin-top: 0.7rem; padding: 0.6rem 0.8rem; background: #f8fafb;
@@ -221,6 +229,10 @@
         const API_URL = 'https://agent-ricoh.purpleocean-d135007c.eastus2.azurecontainerapps.io/api/chat';
         marked.setOptions({ breaks: true, gfm: true });
 
+        // Persistent session
+        let SESSION_ID = localStorage.getItem('ricoh_session') || crypto.randomUUID();
+        localStorage.setItem('ricoh_session', SESSION_ID);
+
         function highlightAgent(name) {
             document.querySelectorAll('.agent-item').forEach(el => el.classList.remove('active'));
             if (name) {
@@ -261,7 +273,7 @@
                 const res = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query }),
+                    body: JSON.stringify({ query, session_id: SESSION_ID }),
                 });
                 const data = await res.json();
                 if (data.error) {
@@ -269,6 +281,14 @@
                 } else {
                     highlightAgent(data.agent);
                     const badge = data.agent ? `<span class="agent-badge">🤖 ${data.agent}</span> ` : '';
+                    let reasoningHtml = '';
+                    if (data.reasoning) {
+                        reasoningHtml = `
+                            <div class="reasoning-box">
+                                <div class="label">🧠 Reasoning</div>
+                                <div class="text">${escapeHtml(data.reasoning)}</div>
+                            </div>`;
+                    }
                     let qualityHtml = '';
                     if (data.quality) {
                         const q = data.quality;
@@ -291,7 +311,7 @@
                             </div>`;
                         highlightAgent('quality_check');
                     }
-                    typing.querySelector('.bubble').innerHTML = badge + marked.parse(data.response) + qualityHtml;
+                    typing.querySelector('.bubble').innerHTML = badge + reasoningHtml + marked.parse(data.response) + qualityHtml;
                 }
             } catch (e) {
                 typing.querySelector('.bubble').innerHTML = `<em>Errore: ${escapeHtml(e.message)}</em>`;

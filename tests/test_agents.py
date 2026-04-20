@@ -20,18 +20,17 @@ def _mock_env():
 
 
 def _base_state(**overrides) -> AgentState:
-    return {"question": "test", "context": "", "route": "rag", "response": "", "quality": None, **overrides}
+    return {"question": "test", "context": "", "route": "rag", "reasoning": "", "response": "", "quality": None, "session_id": "test-session", **overrides}
 
 
 def _fake_llm(content: str):
-    """Returns a RunnableLambda that mimics an LLM returning content."""
     return RunnableLambda(lambda x: MagicMock(content=content))
 
 
 # --- State ---
 
 def test_state_keys():
-    assert set(_base_state().keys()) == {"question", "context", "route", "response", "quality"}
+    assert set(_base_state().keys()) == {"question", "context", "route", "reasoning", "response", "quality", "session_id"}
 
 
 def test_valid_routes():
@@ -42,13 +41,17 @@ def test_valid_routes():
 
 @pytest.mark.parametrize("category", list(VALID_ROUTES))
 def test_router_accepts_all_valid_routes(category):
-    with patch("agents.router._get_llm", return_value=_fake_llm(category)):
+    fake = _fake_llm('{"route": "' + category + '", "reasoning": "test reason"}')
+    with patch("agents.router._get_llm", return_value=fake):
         from agents.router import route
-        assert route(_base_state())["route"] == category
+        result = route(_base_state())
+        assert result["route"] == category
+        assert result["reasoning"] == "test reason"
 
 
 def test_router_defaults_invalid_to_rag():
-    with patch("agents.router._get_llm", return_value=_fake_llm("garbage")):
+    fake = _fake_llm('{"route": "garbage", "reasoning": "x"}')
+    with patch("agents.router._get_llm", return_value=fake):
         from agents.router import route
         assert route(_base_state())["route"] == "rag"
 
