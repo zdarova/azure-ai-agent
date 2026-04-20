@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from agent import RicohAgent
 import logging
 
-app = FastAPI(title="Ricoh AI Knowledge Agent")
+app = FastAPI(title="Ricoh AI Architect Selection")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 agent = RicohAgent()
@@ -19,8 +19,16 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 def chat(req: ChatRequest):
     try:
-        response = agent.run(req.query)
-        return {"response": response}
+        result = agent.graph.invoke({
+            "question": req.query,
+            "context": "",
+            "route": "rag",
+            "response": "",
+        })
+        return {
+            "response": result["response"],
+            "agent": result["route"],
+        }
     except Exception as e:
         logging.error(f"Agent error: {e}")
         return {"error": str(e)}

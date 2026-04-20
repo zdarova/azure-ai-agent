@@ -88,7 +88,8 @@
                     body: JSON.stringify({ query }),
                 });
                 const data = await res.json();
-                typing.querySelector('.bubble').textContent = data.response || data.error;
+                const agentLabel = data.agent ? `[🤖 ${data.agent}] ` : '';
+                typing.querySelector('.bubble').textContent = agentLabel + (data.response || data.error);
             } catch (e) {
                 typing.querySelector('.bubble').textContent = `Errore: ${e.message}`;
             }
