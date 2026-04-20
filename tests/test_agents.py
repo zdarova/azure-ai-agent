@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
+from langchain_core.runnables import RunnableLambda
 from agents import AgentState
 from agents.router import VALID_ROUTES
 
@@ -22,11 +23,15 @@ def _base_state(**overrides) -> AgentState:
     return {"question": "test", "context": "", "route": "rag", "response": "", **overrides}
 
 
+def _fake_llm(content: str):
+    """Returns a RunnableLambda that mimics an LLM returning content."""
+    return RunnableLambda(lambda x: MagicMock(content=content))
+
+
 # --- State ---
 
 def test_state_keys():
-    state = _base_state()
-    assert set(state.keys()) == {"question", "context", "route", "response"}
+    assert set(_base_state().keys()) == {"question", "context", "route", "response"}
 
 
 def test_valid_routes():
@@ -35,21 +40,17 @@ def test_valid_routes():
 
 # --- Router ---
 
-def test_router_defaults_invalid_to_rag():
-    with patch("agents.router.ROUTER_PROMPT.__or__", return_value=MagicMock(
-        invoke=lambda x: MagicMock(content="garbage")
-    )), patch("agents.router._get_llm"):
-        from agents.router import route
-        assert route(_base_state())["route"] == "rag"
-
-
-@pytest.mark.parametrize("category", ["rag", "summarize", "interview", "architecture", "compare", "fallback"])
+@pytest.mark.parametrize("category", list(VALID_ROUTES))
 def test_router_accepts_all_valid_routes(category):
-    with patch("agents.router.ROUTER_PROMPT.__or__", return_value=MagicMock(
-        invoke=lambda x: MagicMock(content=category)
-    )), patch("agents.router._get_llm"):
+    with patch("agents.router._get_llm", return_value=_fake_llm(category)):
         from agents.router import route
         assert route(_base_state())["route"] == category
+
+
+def test_router_defaults_invalid_to_rag():
+    with patch("agents.router._get_llm", return_value=_fake_llm("garbage")):
+        from agents.router import route
+        assert route(_base_state())["route"] == "rag"
 
 
 # --- Graph ---
@@ -70,43 +71,34 @@ def test_graph_has_all_nodes():
 
 # --- Agent nodes ---
 
-def _test_agent_node(module_path, prompt_attr, func_name, state_overrides, expected_in_response):
-    with patch(f"{module_path}._get_llm"), \
-         patch(f"{module_path}.{prompt_attr}.__or__", return_value=MagicMock(
-             invoke=lambda x: MagicMock(content=expected_in_response)
-         )):
+def _test_agent(module_name, func_name, expected, state_overrides=None):
+    with patch(f"{module_name}._get_llm", return_value=_fake_llm(expected)):
         import importlib
-        mod = importlib.import_module(module_path)
+        mod = importlib.import_module(module_name)
         fn = getattr(mod, func_name)
-        result = fn(_base_state(**state_overrides))
-        assert expected_in_response in result["response"]
+        result = fn(_base_state(**(state_overrides or {})))
+        assert result["response"] == expected
 
 
 def test_rag_agent():
-    _test_agent_node("agents.rag_agent", "RAG_PROMPT", "rag_generate",
-                     {"context": "Vimodrone"}, "Ricoh ha sede a Vimodrone")
+    _test_agent("agents.rag_agent", "rag_generate", "Ricoh ha sede a Vimodrone", {"context": "Vimodrone"})
 
 
 def test_fallback_agent():
-    _test_agent_node("agents.fallback", "FALLBACK_PROMPT", "fallback",
-                     {"route": "fallback"}, "Ciao! Sono l'assistente Ricoh.")
+    _test_agent("agents.fallback", "fallback", "Ciao! Sono l'assistente Ricoh.", {"route": "fallback"})
 
 
 def test_interview_coach():
-    _test_agent_node("agents.interview_coach", "COACH_PROMPT", "interview_coach",
-                     {"route": "interview", "context": "RAG"}, "Usa il metodo STAR")
+    _test_agent("agents.interview_coach", "interview_coach", "Usa il metodo STAR", {"route": "interview", "context": "RAG"})
 
 
 def test_architect():
-    _test_agent_node("agents.architect", "ARCH_PROMPT", "architecture_advisor",
-                     {"route": "architecture", "context": "Azure"}, "Container Apps → pgvector")
+    _test_agent("agents.architect", "architecture_advisor", "Container Apps", {"route": "architecture", "context": "Azure"})
 
 
 def test_comparator():
-    _test_agent_node("agents.comparator", "COMPARE_PROMPT", "compare",
-                     {"route": "compare", "context": "info"}, "| Feature | A | B |")
+    _test_agent("agents.comparator", "compare", "Feature A vs B", {"route": "compare", "context": "info"})
 
 
 def test_summarizer():
-    _test_agent_node("agents.summarizer", "SUMMARIZE_PROMPT", "summarize",
-                     {"route": "summarize", "context": "Ricoh info"}, "Ricoh è leader nel digital workplace")
+    _test_agent("agents.summarizer", "summarize", "Ricoh è leader", {"route": "summarize", "context": "Ricoh info"})
