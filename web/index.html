@@ -53,9 +53,10 @@
         </div>
     </div>
 
+    <script src="env.js"></script>
     <script>
         // Configure this after deployment
-        const API_URL = 'https://agent-ricoh.purpleocean-d135007c.eastus2.azurecontainerapps.io/api/chat';
+        const API_URL = window.ENV_API_URL || '/api/chat';
 
         function addMessage(role, text) {
             const chat = document.getElementById('chat');
