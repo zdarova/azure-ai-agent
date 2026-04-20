@@ -44,6 +44,7 @@ jobs:
             --registry $ACR_NAME \
             --resource-group $RESOURCE_GROUP \
             --image ricoh-agent:${{ github.sha }} \
+            --image ricoh-agent:latest \
             --file app/Dockerfile \
             app/
       - name: Deploy to Container App
