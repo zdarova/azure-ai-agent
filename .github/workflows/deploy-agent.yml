@@ -3,7 +3,6 @@ name: Build & Deploy Agent
 on:
   push:
     branches: [main]
-    paths: ['app/**']
   workflow_dispatch:
 
 permissions:
@@ -27,7 +26,6 @@ jobs:
         run: pip install -r app/requirements.txt pytest
       - name: Unit tests
         run: pytest tests/ -v
-        continue-on-error: true
 
   build-deploy:
     needs: test
