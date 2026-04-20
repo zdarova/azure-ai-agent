@@ -3,79 +3,231 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ricoh AI Architect Selection - PoC Demo</title>
+    <title>Ricoh AI Architect Selection</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --ricoh-red: #cc0000;
+            --ricoh-dark: #1a1a2e;
+            --bg: #f7f8fa;
+            --card: #ffffff;
+            --border: #e5e7eb;
+            --text: #1f2937;
+            --text-muted: #6b7280;
+            --accent: #3b82f6;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; height: 100vh; display: flex; flex-direction: column; }
-        header { background: #cc0000; color: white; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
-        header h1 { font-size: 1.3rem; font-weight: 500; }
-        .badge { background: rgba(255,255,255,0.2); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; }
-        .tech-stack { font-size: 0.7rem; color: rgba(255,255,255,0.7); }
-        .chat-container { flex: 1; overflow-y: auto; padding: 2rem; max-width: 800px; margin: 0 auto; width: 100%; }
-        .message { margin-bottom: 1rem; display: flex; gap: 0.75rem; }
-        .message.user { flex-direction: row-reverse; }
-        .message .bubble { max-width: 80%; padding: 0.8rem 1.1rem; border-radius: 12px; line-height: 1.6; font-size: 0.95rem; }
-        .message.user .bubble { background: #cc0000; color: white; border-bottom-right-radius: 4px; }
-        .message.assistant .bubble { background: white; border: 1px solid #e0e0e0; border-bottom-left-radius: 4px; }
-        .message .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; flex-shrink: 0; }
-        .message.user .avatar { background: #990000; color: white; }
-        .message.assistant .avatar { background: #1a1a2e; color: white; }
-        .input-area { border-top: 1px solid #e0e0e0; padding: 1rem 2rem; background: white; }
-        .input-wrapper { max-width: 800px; margin: 0 auto; display: flex; gap: 0.5rem; }
-        input[type="text"] { flex: 1; padding: 0.75rem 1rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; outline: none; }
-        input[type="text"]:focus { border-color: #cc0000; }
-        button { background: #cc0000; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer; font-size: 1rem; }
-        button:hover { background: #aa0000; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .typing { opacity: 0.6; font-style: italic; }
-        .agent-badge { display: inline-block; background: #1a1a2e; color: #8be9fd; font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; font-family: monospace; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); height: 100vh; display: flex; flex-direction: column; color: var(--text); }
 
-        /* Markdown rendering */
-        .bubble h1, .bubble h2, .bubble h3 { margin: 0.6rem 0 0.3rem; font-size: 1rem; }
-        .bubble h1 { font-size: 1.1rem; }
+        /* Header */
+        header {
+            background: linear-gradient(135deg, var(--ricoh-dark) 0%, #16213e 100%);
+            color: white; padding: 0.8rem 2rem; display: flex; align-items: center; justify-content: space-between;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+        }
+        .header-left { display: flex; align-items: center; gap: 0.8rem; }
+        .logo { width: 36px; height: 36px; background: var(--ricoh-red); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.3px; }
+        .header-sub { font-size: 0.65rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
+        .header-right { display: flex; align-items: center; gap: 0.6rem; }
+        .status-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .status-text { font-size: 0.7rem; color: rgba(255,255,255,0.6); }
+        .badge { background: var(--ricoh-red); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; letter-spacing: 0.5px; }
+
+        /* Main layout */
+        .main { flex: 1; display: flex; overflow: hidden; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px; background: var(--card); border-right: 1px solid var(--border);
+            padding: 1.2rem; display: flex; flex-direction: column; gap: 1rem;
+            overflow-y: auto; flex-shrink: 0;
+        }
+        .sidebar h3 { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; }
+        .agent-list { display: flex; flex-direction: column; gap: 0.35rem; }
+        .agent-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; font-size: 0.78rem; color: var(--text-muted); }
+        .agent-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+        .agent-item.active { background: #fef2f2; color: var(--ricoh-red); font-weight: 500; }
+        .dot-rag { background: #3b82f6; } .dot-summarize { background: #8b5cf6; }
+        .dot-interview { background: #f59e0b; } .dot-architecture { background: #10b981; }
+        .dot-compare { background: #ec4899; } .dot-fallback { background: #6b7280; }
+        .dot-quality { background: #22c55e; }
+        .tech-section { margin-top: auto; }
+        .tech-tag { display: inline-block; background: var(--bg); border: 1px solid var(--border); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.6rem; color: var(--text-muted); margin: 0.1rem; }
+
+        /* Chat area */
+        .chat-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .chat-container { flex: 1; overflow-y: auto; padding: 1.5rem 2rem; }
+        .message { margin-bottom: 1.2rem; display: flex; gap: 0.6rem; max-width: 720px; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .message.user { flex-direction: row-reverse; margin-left: auto; }
+        .message .bubble { max-width: 85%; padding: 0.9rem 1.1rem; border-radius: 12px; line-height: 1.65; font-size: 0.9rem; }
+        .message.user .bubble { background: var(--ricoh-red); color: white; border-bottom-right-radius: 4px; }
+        .message.assistant .bubble { background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        .message .avatar {
+            width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center;
+            justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0;
+        }
+        .message.user .avatar { background: #991b1b; color: white; }
+        .message.assistant .avatar { background: var(--ricoh-dark); color: white; }
+
+        /* Input */
+        .input-area { border-top: 1px solid var(--border); padding: 0.8rem 2rem; background: var(--card); }
+        .input-wrapper { max-width: 720px; display: flex; gap: 0.5rem; }
+        input[type="text"] {
+            flex: 1; padding: 0.7rem 1rem; border: 1px solid var(--border); border-radius: 10px;
+            font-size: 0.9rem; outline: none; font-family: inherit; transition: border-color 0.2s;
+        }
+        input[type="text"]:focus { border-color: var(--ricoh-red); box-shadow: 0 0 0 3px rgba(204,0,0,0.08); }
+        button {
+            background: var(--ricoh-red); color: white; border: none; padding: 0.7rem 1.4rem;
+            border-radius: 10px; cursor: pointer; font-size: 0.9rem; font-weight: 500;
+            font-family: inherit; transition: background 0.2s;
+        }
+        button:hover { background: #b91c1c; }
+        button:disabled { background: #d1d5db; cursor: not-allowed; }
+        .typing { opacity: 0.5; font-style: italic; }
+
+        /* Agent badge */
+        .agent-badge {
+            display: inline-block; background: var(--ricoh-dark); color: #8be9fd;
+            font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 4px;
+            font-family: 'SF Mono', Consolas, monospace; margin-bottom: 0.5rem; letter-spacing: 0.3px;
+        }
+
+        /* Quality bar */
+        .quality-bar {
+            margin-top: 0.7rem; padding: 0.6rem 0.8rem; background: #f8fafb;
+            border-radius: 8px; border: 1px solid #e9ecef;
+        }
+        .quality-header { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
+        .quality-header .icon { font-size: 0.8rem; }
+        .quality-header .title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; color: var(--ricoh-dark); }
+        .quality-scores { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+        .metric { display: flex; align-items: center; gap: 0.2rem; font-size: 0.72rem; }
+        .metric-label { color: var(--text-muted); }
+        .stars { color: #f59e0b; letter-spacing: -1px; font-size: 0.8rem; }
+        .quality-note { color: var(--text-muted); font-style: italic; margin-top: 0.3rem; font-size: 0.7rem; }
+        .overall-badge { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem; font-family: monospace; }
+        .overall-5, .overall-4 { background: #dcfce7; color: #166534; }
+        .overall-3 { background: #fef9c3; color: #854d0e; }
+        .overall-2, .overall-1 { background: #fee2e2; color: #991b1b; }
+
+        /* Markdown */
+        .bubble h1, .bubble h2, .bubble h3 { margin: 0.6rem 0 0.3rem; }
+        .bubble h1 { font-size: 1.05rem; } .bubble h2 { font-size: 0.95rem; } .bubble h3 { font-size: 0.9rem; }
         .bubble p { margin: 0.3rem 0; }
-        .bubble ul, .bubble ol { margin: 0.3rem 0 0.3rem 1.4rem; }
-        .bubble li { margin: 0.2rem 0; }
+        .bubble ul, .bubble ol { margin: 0.3rem 0 0.3rem 1.3rem; }
+        .bubble li { margin: 0.15rem 0; }
         .bubble strong { font-weight: 600; }
-        .bubble em { font-style: italic; }
-        .bubble code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.85em; font-family: 'SF Mono', Consolas, monospace; }
-        .bubble pre { background: #1a1a2e; color: #f8f8f2; padding: 0.6rem; border-radius: 6px; overflow-x: auto; margin: 0.4rem 0; }
+        .bubble code { background: #f3f4f6; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.82em; font-family: 'SF Mono', Consolas, monospace; }
+        .bubble pre { background: var(--ricoh-dark); color: #f8f8f2; padding: 0.7rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; font-size: 0.82rem; }
         .bubble pre code { background: none; color: inherit; padding: 0; }
-        .bubble table { border-collapse: collapse; margin: 0.5rem 0; width: 100%; font-size: 0.85rem; }
-        .bubble th, .bubble td { border: 1px solid #ddd; padding: 0.4rem 0.6rem; text-align: left; }
-        .bubble th { background: #f5f5f5; font-weight: 600; }
-        .bubble hr { border: none; border-top: 1px solid #e0e0e0; margin: 0.5rem 0; }
-        .bubble blockquote { border-left: 3px solid #cc0000; padding-left: 0.8rem; margin: 0.4rem 0; color: #555; }
+        .bubble table { border-collapse: collapse; margin: 0.5rem 0; width: 100%; font-size: 0.82rem; }
+        .bubble th, .bubble td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; }
+        .bubble th { background: var(--bg); font-weight: 600; }
+        .bubble hr { border: none; border-top: 1px solid var(--border); margin: 0.6rem 0; }
+        .bubble blockquote { border-left: 3px solid var(--ricoh-red); padding-left: 0.8rem; margin: 0.4rem 0; color: var(--text-muted); }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .chat-container { padding: 1rem; }
+            .input-area { padding: 0.6rem 1rem; }
+        }
     </style>
 </head>
 <body>
     <header>
-        <div>
-            <h1>🤖 Ricoh AI Architect Selection</h1>
-            <div class="tech-stack">Claude Sonnet 4 · Azure AI Foundry · Azure OpenAI · LangChain · LangGraph · pgvector · Azure ML Pipeline · Azure Functions · Container Apps · Static Web Apps · GitHub Actions</div>
+        <div class="header-left">
+            <div class="logo">🤖</div>
+            <div>
+                <h1>Ricoh AI Architect Selection</h1>
+                <div class="header-sub">Multi-Agent RAG System · LangGraph Orchestration</div>
+            </div>
         </div>
-        <span class="badge">PoC Demo</span>
+        <div class="header-right">
+            <div class="status-dot"></div>
+            <span class="status-text">Online</span>
+            <span class="badge">PoC DEMO</span>
+        </div>
     </header>
 
-    <div class="chat-container" id="chat">
-        <div class="message assistant">
-            <div class="avatar">AI</div>
-            <div class="bubble">Ciao! Sono l'assistente AI di Ricoh Italia. Posso rispondere a domande sulle soluzioni, servizi e tecnologie Ricoh. Come posso aiutarti?</div>
-        </div>
-    </div>
+    <div class="main">
+        <aside class="sidebar">
+            <div>
+                <h3>Agents</h3>
+                <div class="agent-list" id="agentList">
+                    <div class="agent-item" data-agent="rag"><span class="dot dot-rag"></span> RAG Knowledge</div>
+                    <div class="agent-item" data-agent="summarize"><span class="dot dot-summarize"></span> Summarizer</div>
+                    <div class="agent-item" data-agent="interview"><span class="dot dot-interview"></span> Interview Coach</div>
+                    <div class="agent-item" data-agent="architecture"><span class="dot dot-architecture"></span> Architecture Advisor</div>
+                    <div class="agent-item" data-agent="compare"><span class="dot dot-compare"></span> Comparator</div>
+                    <div class="agent-item" data-agent="fallback"><span class="dot dot-fallback"></span> Fallback</div>
+                    <div class="agent-item" data-agent="quality_check"><span class="dot dot-quality"></span> Quality Checker</div>
+                </div>
+            </div>
+            <div class="tech-section">
+                <h3>Tech Stack</h3>
+                <div style="margin-top:0.4rem">
+                    <span class="tech-tag">Claude Sonnet 4</span>
+                    <span class="tech-tag">Azure AI Foundry</span>
+                    <span class="tech-tag">Azure OpenAI</span>
+                    <span class="tech-tag">LangChain</span>
+                    <span class="tech-tag">LangGraph</span>
+                    <span class="tech-tag">pgvector</span>
+                    <span class="tech-tag">Azure ML</span>
+                    <span class="tech-tag">Azure Functions</span>
+                    <span class="tech-tag">Container Apps</span>
+                    <span class="tech-tag">Static Web Apps</span>
+                    <span class="tech-tag">GitHub Actions</span>
+                    <span class="tech-tag">Bicep IaC</span>
+                </div>
+            </div>
+        </aside>
 
-    <div class="input-area">
-        <div class="input-wrapper">
-            <input type="text" id="input" placeholder="Chiedi qualcosa su Ricoh Italia..." onkeypress="if(event.key==='Enter')send()">
-            <button onclick="send()" id="btn">Invia</button>
+        <div class="chat-area">
+            <div class="chat-container" id="chat">
+                <div class="message assistant">
+                    <div class="avatar">AI</div>
+                    <div class="bubble">
+                        <strong>Ciao!</strong> Sono l'assistente AI multi-agente di Ricoh Italia.<br><br>
+                        Posso aiutarti con:
+                        <ul>
+                            <li>📚 <strong>Domande</strong> su soluzioni e servizi Ricoh</li>
+                            <li>🎯 <strong>Preparazione colloqui</strong> con coaching STAR method</li>
+                            <li>🏗️ <strong>Architetture Azure</strong> per scenari AI/ML</li>
+                            <li>⚖️ <strong>Confronti</strong> tra tecnologie e soluzioni</li>
+                            <li>📝 <strong>Riassunti</strong> di argomenti complessi</li>
+                        </ul>
+                        <br>Ogni risposta viene verificata da un <strong>Quality Checker</strong> automatico.
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <input type="text" id="input" placeholder="Chiedi qualcosa su Ricoh Italia..." onkeypress="if(event.key==='Enter')send()">
+                    <button onclick="send()" id="btn">Invia</button>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         const API_URL = 'https://agent-ricoh.purpleocean-d135007c.eastus2.azurecontainerapps.io/api/chat';
-
         marked.setOptions({ breaks: true, gfm: true });
+
+        function highlightAgent(name) {
+            document.querySelectorAll('.agent-item').forEach(el => el.classList.remove('active'));
+            if (name) {
+                const el = document.querySelector(`.agent-item[data-agent="${name}"]`);
+                if (el) el.classList.add('active');
+            }
+        }
 
         function addMessage(role, html) {
             const chat = document.getElementById('chat');
@@ -90,11 +242,7 @@
             return div;
         }
 
-        function escapeHtml(text) {
-            const d = document.createElement('div');
-            d.textContent = text;
-            return d.innerHTML;
-        }
+        function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
         async function send() {
             const input = document.getElementById('input');
@@ -105,8 +253,9 @@
             addMessage('user', escapeHtml(query));
             input.value = '';
             btn.disabled = true;
+            highlightAgent(null);
 
-            const typing = addMessage('assistant', '<span class="typing">Sto pensando...</span>');
+            const typing = addMessage('assistant', '<span class="typing">⏳ Routing query to the best agent...</span>');
 
             try {
                 const res = await fetch(API_URL, {
@@ -118,8 +267,31 @@
                 if (data.error) {
                     typing.querySelector('.bubble').innerHTML = `<em>Errore: ${escapeHtml(data.error)}</em>`;
                 } else {
-                    const badge = data.agent ? `<span class="agent-badge">🤖 ${data.agent}</span><br>` : '';
-                    typing.querySelector('.bubble').innerHTML = badge + marked.parse(data.response);
+                    highlightAgent(data.agent);
+                    const badge = data.agent ? `<span class="agent-badge">🤖 ${data.agent}</span> ` : '';
+                    let qualityHtml = '';
+                    if (data.quality) {
+                        const q = data.quality;
+                        const stars = n => '★'.repeat(Math.min(n,5)) + '☆'.repeat(Math.max(5-n,0));
+                        const oc = q.overall >= 4 ? `overall-${q.overall}` : q.overall >= 3 ? 'overall-3' : 'overall-1';
+                        qualityHtml = `
+                            <div class="quality-bar">
+                                <div class="quality-header">
+                                    <span class="icon">✅</span>
+                                    <span class="title">Quality Check · LLM-as-Judge</span>
+                                </div>
+                                <div class="quality-scores">
+                                    <span class="overall-badge ${oc}">${q.overall}/5</span>
+                                    <span class="metric"><span class="metric-label">Rilevanza</span> <span class="stars">${stars(q.relevance)}</span></span>
+                                    <span class="metric"><span class="metric-label">Accuratezza</span> <span class="stars">${stars(q.accuracy)}</span></span>
+                                    <span class="metric"><span class="metric-label">Completezza</span> <span class="stars">${stars(q.completeness)}</span></span>
+                                    <span class="metric"><span class="metric-label">Chiarezza</span> <span class="stars">${stars(q.clarity)}</span></span>
+                                </div>
+                                ${q.note ? `<div class="quality-note">"${q.note}"</div>` : ''}
+                            </div>`;
+                        highlightAgent('quality_check');
+                    }
+                    typing.querySelector('.bubble').innerHTML = badge + marked.parse(data.response) + qualityHtml;
                 }
             } catch (e) {
                 typing.querySelector('.bubble').innerHTML = `<em>Errore: ${escapeHtml(e.message)}</em>`;

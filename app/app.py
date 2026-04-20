@@ -24,10 +24,12 @@ def chat(req: ChatRequest):
             "context": "",
             "route": "rag",
             "response": "",
+            "quality": None,
         })
         return {
             "response": result["response"],
             "agent": result["route"],
+            "quality": result.get("quality"),
         }
     except Exception as e:
         logging.error(f"Agent error: {e}")

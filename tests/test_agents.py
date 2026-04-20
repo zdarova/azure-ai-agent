@@ -20,7 +20,7 @@ def _mock_env():
 
 
 def _base_state(**overrides) -> AgentState:
-    return {"question": "test", "context": "", "route": "rag", "response": "", **overrides}
+    return {"question": "test", "context": "", "route": "rag", "response": "", "quality": None, **overrides}
 
 
 def _fake_llm(content: str):
@@ -31,7 +31,7 @@ def _fake_llm(content: str):
 # --- State ---
 
 def test_state_keys():
-    assert set(_base_state().keys()) == {"question", "context", "route", "response"}
+    assert set(_base_state().keys()) == {"question", "context", "route", "response", "quality"}
 
 
 def test_valid_routes():
@@ -65,7 +65,7 @@ def test_graph_has_all_nodes():
     with _mock_env():
         from graph import build_graph
         nodes = set(build_graph().get_graph().nodes.keys())
-        for n in ("router", "retrieve", "rag", "summarize", "fallback", "interview", "architecture", "compare"):
+        for n in ("router", "retrieve", "rag", "summarize", "fallback", "interview", "architecture", "compare", "quality_check"):
             assert n in nodes
 
 
@@ -102,3 +102,12 @@ def test_comparator():
 
 def test_summarizer():
     _test_agent("agents.summarizer", "summarize", "Ricoh è leader", {"route": "summarize", "context": "Ricoh info"})
+
+
+def test_quality_checker():
+    fake = _fake_llm('{"relevance": 5, "accuracy": 4, "completeness": 4, "clarity": 5, "overall": 4, "note": "Risposta completa"}')
+    with patch("agents.quality_checker._get_llm", return_value=fake):
+        from agents.quality_checker import quality_check
+        result = quality_check(_base_state(response="test response", context="ctx"))
+        assert result["quality"]["overall"] == 4
+        assert result["quality"]["relevance"] == 5
