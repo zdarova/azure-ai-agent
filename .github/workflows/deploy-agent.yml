@@ -10,6 +10,7 @@ permissions:
   contents: read
 
 env:
+  ACR_NAME: crmlricohg4usswaoj3rfi
   CONTAINER_APP: agent-ricoh
   RESOURCE_GROUP: rg-ricoh-ai-poc
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -37,9 +38,17 @@ jobs:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      - name: Build and deploy to Container App
+      - name: Build image in ACR
         run: |
-          az containerapp up \
+          az acr build \
+            --registry $ACR_NAME \
+            --resource-group $RESOURCE_GROUP \
+            --image ricoh-agent:${{ github.sha }} \
+            --file app/Dockerfile \
+            app/
+      - name: Deploy to Container App
+        run: |
+          az containerapp update \
             --name $CONTAINER_APP \
             --resource-group $RESOURCE_GROUP \
-            --source ./app
+            --image $ACR_NAME.azurecr.io/ricoh-agent:${{ github.sha }}
