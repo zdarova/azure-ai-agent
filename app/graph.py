@@ -12,14 +12,16 @@ from agents.architect import architecture_advisor
 from agents.comparator import compare
 from agents.diagram import diagram
 from agents.lineage_agent import lineage_query
+from agents.web_search import web_search
 
-RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "diagram"}
+RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "diagram", "web_search"}
 
 
 def _pick_agent(state: AgentState) -> str:
-    if state["route"] in RETRIEVAL_ROUTES:
+    route = state.get("route", "rag")
+    if route in RETRIEVAL_ROUTES:
         return "retrieve"
-    if state["route"] == "lineage":
+    if route == "lineage":
         return "lineage"
     return "fallback"
 
@@ -41,6 +43,7 @@ def build_graph():
     g.add_node("compare", compare)
     g.add_node("diagram", diagram)
     g.add_node("lineage", lineage_query)
+    g.add_node("web_search", web_search)
 
     g.set_entry_point("router")
     g.add_conditional_edges("router", _pick_agent, {
@@ -56,10 +59,11 @@ def build_graph():
         "architecture": "architecture",
         "compare": "compare",
         "diagram": "diagram",
+        "web_search": "web_search",
     })
 
     # Specialists → END (quality check runs async outside the graph)
-    for node in ("rag", "summarize", "fallback", "interview", "architecture", "compare", "diagram", "lineage"):
+    for node in ("rag", "summarize", "fallback", "interview", "architecture", "compare", "diagram", "lineage", "web_search"):
         g.add_edge(node, END)
 
     return g.compile()
