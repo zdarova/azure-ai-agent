@@ -91,8 +91,12 @@
         .bubble th { background: var(--bg); font-weight: 600; }
         .bubble hr { border: none; border-top: 1px solid var(--border); margin: .6rem 0; }
         .bubble blockquote { border-left: 3px solid var(--red); padding-left: .8rem; margin: .4rem 0; color: var(--muted); }
-        .bubble .mermaid { background: #f8fafb; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: .5rem 0; overflow-x: auto; text-align: center; }
-        .bubble .mermaid svg { max-width: 100%; height: auto; }
+        .bubble .mermaid { background: #f8fafb; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: .5rem 0; overflow: auto; text-align: center; position: relative; min-height: 400px; max-height: 80vh; resize: vertical; }
+        .bubble .mermaid svg { height: auto; min-height: 350px; display: inline-block; cursor: grab; }
+        .bubble .mermaid svg:active { cursor: grabbing; }
+        .diagram-controls { display: flex; gap: .3rem; margin-bottom: .4rem; }
+        .diagram-controls button { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: .2rem .5rem; cursor: pointer; font-size: .75rem; color: var(--text); font-family: inherit; min-width: unset; }
+        .diagram-controls button:hover { background: var(--border); }
         @media (max-width: 768px) { .sidebar { display: none; } .chat-container { padding: 1rem; } .input-area { padding: .6rem 1rem; } }
     </style>
 </head>
@@ -180,6 +184,15 @@
 
         function hl(n) { document.querySelectorAll('.agent-item').forEach(e=>e.classList.remove('active')); if(n){const e=document.querySelector(`.agent-item[data-agent="${n}"]`);if(e)e.classList.add('active');} }
         function esc(t) { const d=document.createElement('div');d.textContent=t;return d.innerHTML; }
+        function zoomDiagram(btn, factor) {
+            const container=btn.closest('.bubble').querySelector('.mermaid');
+            const svg=container.querySelector('svg');
+            if(!svg) return;
+            if(factor==='fit'){svg.dataset.zoom='1';svg.style.transform='scale(1)';svg.style.maxWidth='100%';return;}
+            if(factor==='wide'){svg.dataset.zoom='1';svg.style.transform='scale(1)';svg.style.maxWidth='none';return;}
+            const z=parseFloat(svg.dataset.zoom||1)*factor;
+            svg.dataset.zoom=z;svg.style.transform=`scale(${z})`;svg.style.maxWidth='none';
+        }
         function addMsg(role, html) {
             const c=document.getElementById('chat'), d=document.createElement('div');
             d.className=`message ${role}`;
@@ -210,9 +223,19 @@
         async function showArchitecture() {
             try {
                 const r=await fetch(BASE+'/api/architecture'), d=await r.json(), m=addMsg('assistant','<span class="agent-badge">📐 architecture</span> ');
-                m.classList.add('wide'); const b=m.querySelector('.bubble'), c=document.createElement('div');
-                c.className='mermaid'; c.textContent=d.diagram; b.appendChild(c);
-                try{await mermaid.run({nodes:[c]})}catch(e){} document.getElementById('chat').scrollTop=9999;
+                m.classList.add('wide'); const b=m.querySelector('.bubble');
+                b.innerHTML+='<div class="diagram-controls"><button onclick="zoomDiagram(this,1.2)">🔍+</button><button onclick="zoomDiagram(this,0.8)">🔍−</button><button onclick="zoomDiagram(this,\'fit\')">↩ Fit</button><button onclick="zoomDiagram(this,\'wide\')">↔ Wide</button></div>';
+                const c=document.createElement('div');c.className='mermaid';c.textContent=d.diagram;b.appendChild(c);
+                try{await mermaid.run({nodes:[c]})}catch(e){}
+                c.querySelectorAll('svg').forEach(svg=>{
+                    svg.style.maxWidth='none';svg.style.transform='scale(1)';svg.style.transformOrigin='top left';svg.dataset.zoom='1';
+                    let drag=false,sx,sy,sl,st;
+                    svg.addEventListener('mousedown',e=>{drag=true;sx=e.clientX;sy=e.clientY;sl=c.scrollLeft;st=c.scrollTop;svg.style.cursor='grabbing';});
+                    document.addEventListener('mousemove',e=>{if(!drag)return;c.scrollLeft=sl-(e.clientX-sx);c.scrollTop=st-(e.clientY-sy);});
+                    document.addEventListener('mouseup',()=>{drag=false;svg.style.cursor='grab';});
+                    c.addEventListener('wheel',e=>{e.preventDefault();const z=parseFloat(svg.dataset.zoom||1);const nz=e.deltaY<0?z*1.15:z/1.15;svg.dataset.zoom=nz;svg.style.transform=`scale(${nz})`;},{passive:false});
+                });
+                document.getElementById('chat').scrollTop=9999;
             } catch(e){addMsg('assistant',`<em>Errore: ${e.message}</em>`);}
         }
         async function showMetrics() {
@@ -263,8 +286,32 @@
                                 } else if(ev==='response'){
                                     resp=marked.parse(d.text); if(d.text.includes('```mermaid'))msg.classList.add('wide');
                                     bub.innerHTML=badge+reason+resp+'<div id="qp" class="typing" style="margin-top:.5rem">🔍 Quality check...</div>';
-                                    bub.querySelectorAll('code.language-mermaid').forEach(el=>{const p=el.parentElement,c=document.createElement('div');c.className='mermaid';c.textContent=el.textContent;p.replaceWith(c);});
+                                    bub.querySelectorAll('code.language-mermaid').forEach(el=>{
+                                        const p=el.parentElement;
+                                        const wrapper=document.createElement('div');
+                                        wrapper.innerHTML=`<div class="diagram-controls">
+                                            <button onclick="zoomDiagram(this,1.2)">🔍+</button>
+                                            <button onclick="zoomDiagram(this,0.8)">🔍−</button>
+                                            <button onclick="zoomDiagram(this,'fit')">Fit</button>
+                                            <button onclick="zoomDiagram(this,'wide')">Wide</button>
+                                        </div>`;
+                                        const c=document.createElement('div');c.className='mermaid';c.textContent=el.textContent;
+                                        wrapper.appendChild(c); p.replaceWith(wrapper);
+                                    });
                                     try{await mermaid.run({nodes:bub.querySelectorAll('.mermaid')})}catch(e){}
+                                    // Set initial scale for large diagrams
+                                    bub.querySelectorAll('.mermaid svg').forEach(svg=>{
+                                        svg.style.maxWidth='none'; svg.style.transform='scale(1)'; svg.style.transformOrigin='top left';
+                                        svg.dataset.zoom='1';
+                                        // Enable drag
+                                        let drag=false,sx,sy,sl,st;
+                                        const par=svg.parentElement;
+                                        svg.addEventListener('mousedown',e=>{drag=true;sx=e.clientX;sy=e.clientY;sl=par.scrollLeft;st=par.scrollTop;svg.style.cursor='grabbing';});
+                                        document.addEventListener('mousemove',e=>{if(!drag)return;par.scrollLeft=sl-(e.clientX-sx);par.scrollTop=st-(e.clientY-sy);});
+                                        document.addEventListener('mouseup',()=>{drag=false;svg.style.cursor='grab';});
+                                        // Mouse wheel zoom
+                                        par.addEventListener('wheel',e=>{e.preventDefault();const z=parseFloat(svg.dataset.zoom||1);const nz=e.deltaY<0?z*1.15:z/1.15;svg.dataset.zoom=nz;svg.style.transform=`scale(${nz})`;},{passive:false});
+                                    });
                                     document.getElementById('chat').scrollTop=9999;
                                 } else if(ev==='quality'){
                                     hl('quality_check'); const p=bub.querySelector('#qp');if(p)p.remove();

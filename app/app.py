@@ -170,7 +170,7 @@ def metrics():
 @app.get("/api/architecture")
 def architecture():
     """Returns the live system architecture as a Mermaid diagram."""
-    return {"diagram": """flowchart TD
+    return {"diagram": """flowchart LR
     User[Browser / Static Web App] -->|POST /api/chat SSE| CA[Container Apps - FastAPI + LangGraph]
 
     subgraph Security[Security Layer]
