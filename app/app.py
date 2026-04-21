@@ -20,6 +20,7 @@ from memory import save_turn, get_history
 from guardrails import check_input
 from feedback import save_feedback, get_feedback_stats
 from observability import get_metrics
+from longterm_memory import get_memories, extract_facts, save_memories
 import logging
 
 app = FastAPI(title="Ricoh AI Architect Selection")
@@ -73,6 +74,12 @@ def chat(req: ChatRequest):
             ) if history else ""
 
             question = req.query if not history_ctx else f"[Conversazione precedente:\n{history_ctx}]\n\nNuova domanda: {req.query}"
+
+            # Inject long-term memories
+            memories = get_memories(req.session_id)
+            if memories:
+                question = f"[{memories}]\n\n{question}"
+
             msg_id = str(uuid.uuid4())[:8]
 
             state = {
@@ -112,6 +119,15 @@ def chat(req: ChatRequest):
             # Step 5: Tracing info
             metrics = get_metrics()
             yield _sse("trace", {"metrics": metrics})
+
+            # Step 6: Extract and save long-term memories (async, non-blocking)
+            try:
+                facts = extract_facts(req.query, state["response"], state["route"])
+                if facts:
+                    save_memories(req.session_id, facts)
+                    yield _sse("memory", {"new_facts": len(facts)})
+            except Exception:
+                pass
 
             # Save to Cosmos (skip if PII detected)
             if not guard["pii_detected"]:

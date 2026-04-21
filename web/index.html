@@ -254,6 +254,8 @@
                                 } else if(ev==='trace'){
                                     if(d.metrics){const items=Object.entries(d.metrics).filter(([,v])=>v.last_ms>0).map(([k,v])=>`<span>${k}:<strong>${v.last_ms}ms</strong></span>`).join(' · ');
                                     if(items){const t=document.createElement('div');t.innerHTML=`<div class="trace-bar"><div class="trace-title">⏱️ Trace</div><div class="trace-items">${items}</div></div>`;bub.appendChild(t.firstElementChild);}}
+                                } else if(ev==='memory'){
+                                    if(d.new_facts>0){const md=document.createElement('div');md.innerHTML=`<div style="margin-top:.4rem;font-size:.65rem;color:#7c3aed">🧠 ${d.new_facts} new fact${d.new_facts>1?'s':''} memorized</div>`;bub.appendChild(md.firstElementChild);}
                                 } else if(ev==='done'){
                                     const fb=document.createElement('div');fb.className='feedback-row';
                                     fb.innerHTML=`<span class="feedback-label">Utile?</span><button class="fb-btn" onclick="sendFb('${mid}','thumbs_up',this)">👍</button><button class="fb-btn" onclick="sendFb('${mid}','thumbs_down',this)">👎</button>`;
