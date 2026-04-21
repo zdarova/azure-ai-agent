@@ -8,7 +8,7 @@ from agents import AgentState
 
 _llm = None
 
-VALID_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "fallback"}
+VALID_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "diagram", "fallback"}
 
 
 def _get_llm():
@@ -30,6 +30,7 @@ ROUTER_PROMPT = ChatPromptTemplate.from_template(
     "- summarize: requests to summarize, condense, or give an overview of a topic\n"
     "- interview: interview preparation, how to answer questions, coaching for job interviews\n"
     "- architecture: designing systems, proposing architectures, technical design questions\n"
+    "- diagram: requests to draw, visualize, create a diagram, flowchart, or schema\n"
     "- compare: comparing two or more solutions, technologies, or approaches\n"
     "- fallback: greetings, off-topic, or questions unrelated to Ricoh\n\n"
     "Question: {question}\n"

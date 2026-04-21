@@ -53,6 +53,7 @@
         .dot-rag { background: #3b82f6; } .dot-summarize { background: #8b5cf6; }
         .dot-interview { background: #f59e0b; } .dot-architecture { background: #10b981; }
         .dot-compare { background: #ec4899; } .dot-fallback { background: #6b7280; }
+        .dot-diagram { background: #06b6d4; }
         .dot-quality { background: #22c55e; }
         .tech-section { margin-top: auto; }
         .tech-tag { display: inline-block; background: var(--bg); border: 1px solid var(--border); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.6rem; color: var(--text-muted); margin: 0.1rem; }
@@ -138,6 +139,8 @@
         .bubble th { background: var(--bg); font-weight: 600; }
         .bubble hr { border: none; border-top: 1px solid var(--border); margin: 0.6rem 0; }
         .bubble blockquote { border-left: 3px solid var(--ricoh-red); padding-left: 0.8rem; margin: 0.4rem 0; color: var(--text-muted); }
+        .bubble .mermaid { background: #f8fafb; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: 0.5rem 0; overflow-x: auto; }
+        .bubble .mermaid svg { max-width: 100%; height: auto; }
 
         /* Responsive */
         @media (max-width: 768px) {
@@ -173,6 +176,7 @@
                     <div class="agent-item" data-agent="interview"><span class="dot dot-interview"></span> Interview Coach</div>
                     <div class="agent-item" data-agent="architecture"><span class="dot dot-architecture"></span> Architecture Advisor</div>
                     <div class="agent-item" data-agent="compare"><span class="dot dot-compare"></span> Comparator</div>
+                    <div class="agent-item" data-agent="diagram"><span class="dot dot-diagram"></span> Diagram Generator</div>
                     <div class="agent-item" data-agent="fallback"><span class="dot dot-fallback"></span> Fallback</div>
                     <div class="agent-item" data-agent="quality_check"><span class="dot dot-quality"></span> Quality Checker</div>
                 </div>
@@ -208,6 +212,7 @@
                             <li>🎯 <strong>Preparazione colloqui</strong> con coaching STAR method</li>
                             <li>🏗️ <strong>Architetture Azure</strong> per scenari AI/ML</li>
                             <li>⚖️ <strong>Confronti</strong> tra tecnologie e soluzioni</li>
+                            <li>📊 <strong>Diagrammi</strong> architetturali da prompt</li>
                             <li>📝 <strong>Riassunti</strong> di argomenti complessi</li>
                         </ul>
                         <br>Ogni risposta viene verificata da un <strong>Quality Checker</strong> automatico.
@@ -225,7 +230,9 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script>
+        mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
         const API_URL = 'https://agent-ricoh.purpleocean-d135007c.eastus2.azurecontainerapps.io/api/chat';
         marked.setOptions({ breaks: true, gfm: true });
 
@@ -332,9 +339,18 @@
                                     bubble.innerHTML = badgeHtml + reasoningHtml + '<span class="typing">✍️ Generating response...</span>';
                                     document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
                                 }
-                                else if (eventType === 'response') {
+                    else if (eventType === 'response') {
                                     responseHtml = marked.parse(data.text);
                                     bubble.innerHTML = badgeHtml + reasoningHtml + responseHtml + '<div class="typing" style="margin-top:0.5rem">🔍 Quality check in corso...</div>';
+                                    // Render any mermaid diagrams
+                                    bubble.querySelectorAll('code.language-mermaid').forEach(async (el) => {
+                                        const pre = el.parentElement;
+                                        const container = document.createElement('div');
+                                        container.className = 'mermaid';
+                                        container.textContent = el.textContent;
+                                        pre.replaceWith(container);
+                                    });
+                                    await mermaid.run({ nodes: bubble.querySelectorAll('.mermaid') });
                                     document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
                                 }
                                 else if (eventType === 'quality') {

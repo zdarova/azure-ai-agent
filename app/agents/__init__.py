@@ -7,7 +7,7 @@ from typing_extensions import TypedDict
 class AgentState(TypedDict):
     question: str
     context: str
-    route: Literal["rag", "summarize", "interview", "architecture", "compare", "fallback"]
+    route: Literal["rag", "summarize", "interview", "architecture", "compare", "diagram", "fallback"]
     reasoning: str
     response: str
     quality: Optional[dict]

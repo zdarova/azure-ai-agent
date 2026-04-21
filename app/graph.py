@@ -10,8 +10,9 @@ from agents.fallback import fallback
 from agents.interview_coach import interview_coach
 from agents.architect import architecture_advisor
 from agents.comparator import compare
+from agents.diagram import diagram
 
-RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare"}
+RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "diagram"}
 
 
 def _pick_agent(state: AgentState) -> str:
@@ -35,6 +36,7 @@ def build_graph():
     g.add_node("interview", interview_coach)
     g.add_node("architecture", architecture_advisor)
     g.add_node("compare", compare)
+    g.add_node("diagram", diagram)
 
     g.set_entry_point("router")
     g.add_conditional_edges("router", _pick_agent, {
@@ -48,10 +50,11 @@ def build_graph():
         "interview": "interview",
         "architecture": "architecture",
         "compare": "compare",
+        "diagram": "diagram",
     })
 
     # Specialists → END (quality check runs async outside the graph)
-    for node in ("rag", "summarize", "fallback", "interview", "architecture", "compare"):
+    for node in ("rag", "summarize", "fallback", "interview", "architecture", "compare", "diagram"):
         g.add_edge(node, END)
 
     return g.compile()

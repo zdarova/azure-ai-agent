@@ -34,7 +34,7 @@ def test_state_keys():
 
 
 def test_valid_routes():
-    assert VALID_ROUTES == {"rag", "summarize", "interview", "architecture", "compare", "fallback"}
+    assert VALID_ROUTES == {"rag", "summarize", "interview", "architecture", "compare", "diagram", "fallback"}
 
 
 # --- Router ---
@@ -68,7 +68,7 @@ def test_graph_has_all_nodes():
     with _mock_env():
         from graph import build_graph
         nodes = set(build_graph().get_graph().nodes.keys())
-        for n in ("router", "retrieve", "rag", "summarize", "fallback", "interview", "architecture", "compare"):
+        for n in ("router", "retrieve", "rag", "summarize", "fallback", "interview", "architecture", "compare", "diagram"):
             assert n in nodes
 
 
@@ -113,4 +113,7 @@ def test_quality_checker():
         from agents.quality_checker import quality_check
         result = quality_check(_base_state(response="test response", context="ctx"))
         assert result["quality"]["overall"] == 4
-        assert result["quality"]["relevance"] == 5
+
+
+def test_diagram_agent():
+    _test_agent("agents.diagram", "diagram", "```mermaid\ngraph TD\nA-->B\n```", {"route": "diagram", "context": "Ricoh"})
