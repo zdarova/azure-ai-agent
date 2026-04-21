@@ -1,4 +1,4 @@
-"""Ricoh AI Knowledge Agent - FastAPI with SSE streaming + observability."""
+"""Ricoh AI Knowledge Agent - FastAPI with multi-route SSE streaming."""
 
 import uuid
 import json
@@ -16,12 +16,12 @@ from agents.architect import architecture_advisor
 from agents.comparator import compare
 from agents.diagram import diagram
 from agents.lineage_agent import lineage_query
-from agents.quality_checker import quality_check
+from agents.web_search import web_search
+from agents.quality_checker import quality_check, get_quality_averages
 from memory import save_turn, get_history
 from guardrails import check_input
 from feedback import save_feedback, get_feedback_stats
 from observability import get_metrics
-from agents.quality_checker import get_quality_averages
 from longterm_memory import get_memories, extract_facts, save_memories
 import logging
 
@@ -36,10 +36,12 @@ SPECIALISTS = {
     "compare": compare,
     "diagram": diagram,
     "lineage": lineage_query,
+    "web_search": web_search,
     "fallback": fallback,
 }
 
-RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "diagram"}
+RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "diagram", "web_search"}
+NO_RETRIEVE_ROUTES = {"lineage", "fallback"}
 
 
 class ChatRequest(BaseModel):
@@ -50,7 +52,7 @@ class ChatRequest(BaseModel):
 class FeedbackRequest(BaseModel):
     session_id: str
     message_id: str
-    rating: str  # "thumbs_up" or "thumbs_down"
+    rating: str
 
 
 def _sse(event: str, data: dict) -> str:
@@ -61,7 +63,7 @@ def _sse(event: str, data: dict) -> str:
 def chat(req: ChatRequest):
     def stream():
         try:
-            # Guardrails check
+            # Guardrails
             guard = check_input(req.query)
             if not guard["safe"]:
                 yield _sse("error", {"message": f"🛡️ {guard['reason']}"})
@@ -69,7 +71,7 @@ def chat(req: ChatRequest):
             if guard["pii_detected"]:
                 yield _sse("warning", {"message": f"⚠️ PII rilevato: {', '.join(guard['pii_detected'])}. Procedo senza memorizzare."})
 
-            # Build initial state
+            # Build state
             history = get_history(req.session_id)
             history_ctx = "\n".join(
                 f"User: {h.get('question','')}\nAssistant: {h.get('response','')[:200]}"
@@ -78,7 +80,6 @@ def chat(req: ChatRequest):
 
             question = req.query if not history_ctx else f"[Conversazione precedente:\n{history_ctx}]\n\nNuova domanda: {req.query}"
 
-            # Inject long-term memories
             memories = get_memories(req.session_id)
             if memories:
                 question = f"[{memories}]\n\n{question}"
@@ -88,6 +89,7 @@ def chat(req: ChatRequest):
             state = {
                 "question": question,
                 "context": "",
+                "routes": ["rag"],
                 "route": "rag",
                 "reasoning": "",
                 "response": "",
@@ -95,49 +97,70 @@ def chat(req: ChatRequest):
                 "session_id": req.session_id,
             }
 
-            # Step 1: Router
+            # Step 1: Router (multi-route)
             state = run_router(state)
+            routes = state.get("routes", [state.get("route", "rag")])
             yield _sse("routing", {
-                "agent": state["route"],
+                "agents": routes,
+                "agent": routes[0],
                 "reasoning": state.get("reasoning", ""),
                 "message_id": msg_id,
+                "multi": len(routes) > 1,
             })
 
-            # Step 2: Retrieve
-            if state["route"] in RETRIEVAL_ROUTES:
+            # Step 2: Retrieve once (shared across agents that need it)
+            needs_retrieval = any(r in RETRIEVAL_ROUTES for r in routes)
+            if needs_retrieval:
                 state = run_retriever(state)
 
-            # Step 3: Specialist
-            specialist = SPECIALISTS.get(state["route"], rag_generate)
-            state = specialist(state)
-            yield _sse("response", {"text": state["response"]})
+            # Step 3: Execute each specialist and stream progressively
+            all_responses = []
+            for i, agent_route in enumerate(routes):
+                state["route"] = agent_route
+                specialist = SPECIALISTS.get(agent_route, rag_generate)
+                agent_state = specialist(state)
 
-            # Step 4: Quality check (async)
+                agent_response = agent_state["response"]
+                all_responses.append(agent_response)
+
+                # Send each agent's response as it completes
+                yield _sse("agent_response", {
+                    "agent": agent_route,
+                    "text": agent_response,
+                    "index": i,
+                    "total": len(routes),
+                })
+
+            # Merge all responses
+            merged = "\n\n---\n\n".join(all_responses)
+            state["response"] = merged
+            yield _sse("response", {"text": merged})
+
+            # Step 4: Quality check
             try:
                 state = quality_check(state)
                 yield _sse("quality", {"quality": state.get("quality")})
             except Exception:
                 yield _sse("quality", {"quality": None})
 
-            # Step 5: Tracing info
-            metrics = get_metrics()
-            yield _sse("trace", {"metrics": metrics})
+            # Step 5: Trace
+            yield _sse("trace", {"metrics": get_metrics()})
 
-            # Step 6: Extract and save long-term memories (async, non-blocking)
+            # Step 6: Long-term memory
             try:
-                facts = extract_facts(req.query, state["response"], state["route"])
+                facts = extract_facts(req.query, state["response"], ",".join(routes))
                 if facts:
                     save_memories(req.session_id, facts)
                     yield _sse("memory", {"new_facts": len(facts)})
             except Exception:
                 pass
 
-            # Save to Cosmos (skip if PII detected)
+            # Save to Cosmos
             if not guard["pii_detected"]:
                 save_turn(
                     session_id=req.session_id,
                     question=req.query,
-                    route=state["route"],
+                    route=",".join(routes),
                     reasoning=state.get("reasoning", ""),
                     response=state["response"],
                     quality=state.get("quality"),
@@ -169,7 +192,6 @@ def metrics():
 
 @app.get("/api/architecture")
 def architecture():
-    """Returns the live system architecture as a Mermaid diagram."""
     return {"diagram": """flowchart LR
     User[Browser / Static Web App] -->|POST /api/chat SSE| CA[Container Apps - FastAPI + LangGraph]
 
@@ -178,11 +200,11 @@ def architecture():
     end
 
     subgraph Orchestration[LangGraph Orchestration]
-        Router[Router Agent - Intent Classification + Reasoning]
+        Router[Router Agent - Multi-Route Classification]
         LTM[Long-term Memory - Cosmos DB]
     end
 
-    subgraph Specialists[11 Specialist Agents]
+    subgraph Specialists[12 Specialist Agents]
         RAG[RAG Knowledge]
         SUM[Summarizer]
         INT[Interview Coach]
@@ -190,10 +212,11 @@ def architecture():
         CMP[Comparator]
         DIA[Diagram Generator]
         LIN[Data Lineage]
+        WEB[Web Search - DuckDuckGo]
         FB[Fallback]
     end
 
-    subgraph QualityLayer[Quality Assurance]
+    subgraph QualityLayer[Quality Assurance - 9 Dimensions]
         QC[Quality Checker - LLM-as-Judge]
         FBK[Feedback Loop]
         OBS[Observability - Tracing + Metrics]
@@ -201,7 +224,7 @@ def architecture():
 
     subgraph DataLayer[Data Layer]
         PGV[(pgvector - PostgreSQL)]
-        Cosmos[(Cosmos DB - Conversations + Memory)]
+        Cosmos[(Cosmos DB - Conversations + Memory + Metrics)]
     end
 
     subgraph Ingestion[Data Ingestion]
@@ -226,20 +249,22 @@ def architecture():
     subgraph AI[AI Services]
         Claude[Claude Sonnet 4 - Azure AI Foundry]
         OAI[Azure OpenAI - text-embedding-3-small]
+        DDG[DuckDuckGo Search API]
     end
 
     User -->|Query| CA
     CA --> GR
     GR --> Router
     Router -->|Inject memories| LTM
-    Router -->|Route| RAG
-    Router -->|Route| SUM
-    Router -->|Route| INT
-    Router -->|Route| ARCH
-    Router -->|Route| CMP
-    Router -->|Route| DIA
-    Router -->|Route| LIN
-    Router -->|Route| FB
+    Router -->|Multi-route 1-3 agents| RAG
+    Router -->|Multi-route| SUM
+    Router -->|Multi-route| INT
+    Router -->|Multi-route| ARCH
+    Router -->|Multi-route| CMP
+    Router -->|Multi-route| DIA
+    Router -->|Multi-route| LIN
+    Router -->|Multi-route| WEB
+    Router -->|Multi-route| FB
 
     RAG -->|Retrieve| PGV
     SUM -->|Retrieve| PGV
@@ -248,6 +273,7 @@ def architecture():
     CMP -->|Retrieve| PGV
     DIA -->|Retrieve| PGV
     LIN -->|Query lineage| PGV
+    WEB -->|Search| DDG
 
     Specialists --> QC
     QC --> OBS

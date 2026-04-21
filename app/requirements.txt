@@ -9,3 +9,4 @@ psycopg[binary]>=3.1.0
 pgvector>=0.3.0
 pydantic>=2.0.0
 azure-cosmos>=4.7.0
+ddgs>=9.0.0
