@@ -256,6 +256,26 @@
 
         function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
+        function renderQuality(q) {
+            const stars = n => '★'.repeat(Math.min(n,5)) + '☆'.repeat(Math.max(5-n,0));
+            const oc = q.overall >= 4 ? `overall-${q.overall}` : q.overall >= 3 ? 'overall-3' : 'overall-1';
+            return `
+                <div class="quality-bar" style="animation: fadeIn 0.3s ease">
+                    <div class="quality-header">
+                        <span class="icon">✅</span>
+                        <span class="title">Quality Check · LLM-as-Judge</span>
+                    </div>
+                    <div class="quality-scores">
+                        <span class="overall-badge ${oc}">${q.overall}/5</span>
+                        <span class="metric"><span class="metric-label">Rilevanza</span> <span class="stars">${stars(q.relevance)}</span></span>
+                        <span class="metric"><span class="metric-label">Accuratezza</span> <span class="stars">${stars(q.accuracy)}</span></span>
+                        <span class="metric"><span class="metric-label">Completezza</span> <span class="stars">${stars(q.completeness)}</span></span>
+                        <span class="metric"><span class="metric-label">Chiarezza</span> <span class="stars">${stars(q.clarity)}</span></span>
+                    </div>
+                    ${q.note ? `<div class="quality-note">"${q.note}"</div>` : ''}
+                </div>`;
+        }
+
         async function send() {
             const input = document.getElementById('input');
             const btn = document.getElementById('btn');
@@ -267,7 +287,8 @@
             btn.disabled = true;
             highlightAgent(null);
 
-            const typing = addMessage('assistant', '<span class="typing">⏳ Routing query to the best agent...</span>');
+            const msg = addMessage('assistant', '<span class="typing">⏳ Routing query to the best agent...</span>');
+            const bubble = msg.querySelector('.bubble');
 
             try {
                 const res = await fetch(API_URL, {
@@ -275,46 +296,63 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query, session_id: SESSION_ID }),
                 });
-                const data = await res.json();
-                if (data.error) {
-                    typing.querySelector('.bubble').innerHTML = `<em>Errore: ${escapeHtml(data.error)}</em>`;
-                } else {
-                    highlightAgent(data.agent);
-                    const badge = data.agent ? `<span class="agent-badge">🤖 ${data.agent}</span> ` : '';
-                    let reasoningHtml = '';
-                    if (data.reasoning) {
-                        reasoningHtml = `
-                            <div class="reasoning-box">
-                                <div class="label">🧠 Reasoning</div>
-                                <div class="text">${escapeHtml(data.reasoning)}</div>
-                            </div>`;
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let badgeHtml = '', reasoningHtml = '', responseHtml = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Parse SSE events from buffer
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // keep incomplete line
+
+                    let eventType = '';
+                    for (const line of lines) {
+                        if (line.startsWith('event: ')) {
+                            eventType = line.slice(7).trim();
+                        } else if (line.startsWith('data: ') && eventType) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+
+                                if (eventType === 'routing') {
+                                    highlightAgent(data.agent);
+                                    badgeHtml = data.agent ? `<span class="agent-badge">🤖 ${data.agent}</span> ` : '';
+                                    if (data.reasoning) {
+                                        reasoningHtml = `
+                                            <div class="reasoning-box">
+                                                <div class="label">🧠 Reasoning</div>
+                                                <div class="text">${escapeHtml(data.reasoning)}</div>
+                                            </div>`;
+                                    }
+                                    bubble.innerHTML = badgeHtml + reasoningHtml + '<span class="typing">✍️ Generating response...</span>';
+                                    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+                                }
+                                else if (eventType === 'response') {
+                                    responseHtml = marked.parse(data.text);
+                                    bubble.innerHTML = badgeHtml + reasoningHtml + responseHtml + '<div class="typing" style="margin-top:0.5rem">🔍 Quality check in corso...</div>';
+                                    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+                                }
+                                else if (eventType === 'quality') {
+                                    highlightAgent('quality_check');
+                                    const qualityHtml = data.quality ? renderQuality(data.quality) : '';
+                                    bubble.innerHTML = badgeHtml + reasoningHtml + responseHtml + qualityHtml;
+                                    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
+                                }
+                                else if (eventType === 'error') {
+                                    bubble.innerHTML = `<em>Errore: ${escapeHtml(data.message)}</em>`;
+                                }
+                            } catch (e) { /* skip malformed JSON */ }
+                            eventType = '';
+                        }
                     }
-                    let qualityHtml = '';
-                    if (data.quality) {
-                        const q = data.quality;
-                        const stars = n => '★'.repeat(Math.min(n,5)) + '☆'.repeat(Math.max(5-n,0));
-                        const oc = q.overall >= 4 ? `overall-${q.overall}` : q.overall >= 3 ? 'overall-3' : 'overall-1';
-                        qualityHtml = `
-                            <div class="quality-bar">
-                                <div class="quality-header">
-                                    <span class="icon">✅</span>
-                                    <span class="title">Quality Check · LLM-as-Judge</span>
-                                </div>
-                                <div class="quality-scores">
-                                    <span class="overall-badge ${oc}">${q.overall}/5</span>
-                                    <span class="metric"><span class="metric-label">Rilevanza</span> <span class="stars">${stars(q.relevance)}</span></span>
-                                    <span class="metric"><span class="metric-label">Accuratezza</span> <span class="stars">${stars(q.accuracy)}</span></span>
-                                    <span class="metric"><span class="metric-label">Completezza</span> <span class="stars">${stars(q.completeness)}</span></span>
-                                    <span class="metric"><span class="metric-label">Chiarezza</span> <span class="stars">${stars(q.clarity)}</span></span>
-                                </div>
-                                ${q.note ? `<div class="quality-note">"${q.note}"</div>` : ''}
-                            </div>`;
-                        highlightAgent('quality_check');
-                    }
-                    typing.querySelector('.bubble').innerHTML = badge + reasoningHtml + marked.parse(data.response) + qualityHtml;
                 }
             } catch (e) {
-                typing.querySelector('.bubble').innerHTML = `<em>Errore: ${escapeHtml(e.message)}</em>`;
+                bubble.innerHTML = `<em>Errore: ${escapeHtml(e.message)}</em>`;
             }
             btn.disabled = false;
             input.focus();

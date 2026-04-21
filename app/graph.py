@@ -10,7 +10,6 @@ from agents.fallback import fallback
 from agents.interview_coach import interview_coach
 from agents.architect import architecture_advisor
 from agents.comparator import compare
-from agents.quality_checker import quality_check
 
 RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare"}
 
@@ -36,16 +35,13 @@ def build_graph():
     g.add_node("interview", interview_coach)
     g.add_node("architecture", architecture_advisor)
     g.add_node("compare", compare)
-    g.add_node("quality_check", quality_check)
 
-    # Start → router → needs retrieval or not
     g.set_entry_point("router")
     g.add_conditional_edges("router", _pick_agent, {
         "retrieve": "retrieve",
         "fallback": "fallback",
     })
 
-    # After retrieve → pick specialist
     g.add_conditional_edges("retrieve", _post_retrieve, {
         "rag": "rag",
         "summarize": "summarize",
@@ -54,10 +50,8 @@ def build_graph():
         "compare": "compare",
     })
 
-    # All specialists → quality check → END
+    # Specialists → END (quality check runs async outside the graph)
     for node in ("rag", "summarize", "fallback", "interview", "architecture", "compare"):
-        g.add_edge(node, "quality_check")
-
-    g.add_edge("quality_check", END)
+        g.add_edge(node, END)
 
     return g.compile()

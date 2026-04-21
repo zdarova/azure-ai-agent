@@ -68,7 +68,7 @@ def test_graph_has_all_nodes():
     with _mock_env():
         from graph import build_graph
         nodes = set(build_graph().get_graph().nodes.keys())
-        for n in ("router", "retrieve", "rag", "summarize", "fallback", "interview", "architecture", "compare", "quality_check"):
+        for n in ("router", "retrieve", "rag", "summarize", "fallback", "interview", "architecture", "compare"):
             assert n in nodes
 
 
