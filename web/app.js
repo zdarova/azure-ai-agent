@@ -78,7 +78,7 @@ async function renderMermaidBlocks(bubble) {
 }
 
 function zoomDiagram(btn, factor) {
-    const container = btn.closest('.bubble').querySelector('.mermaid');
+    const container = btn.closest('.diagram-controls').parentElement.querySelector('.mermaid');
     const svg = container?.querySelector('svg');
     if (!svg) return;
     if (factor === 'fit') { svg.dataset.zoom = '1'; svg.style.transform = 'scale(1)'; svg.style.maxWidth = '100%'; return; }
@@ -119,8 +119,9 @@ async function showArchitecture() {
         const m = addMsg('assistant', '<span class="agent-badge">📐 architecture</span> ');
         m.classList.add('wide');
         const b = m.querySelector('.bubble');
-        b.innerHTML += '<div class="diagram-controls"><button onclick="zoomDiagram(this,1.2)">🔍+</button><button onclick="zoomDiagram(this,0.8)">🔍−</button><button onclick="zoomDiagram(this,\'fit\')">↩ Fit</button><button onclick="zoomDiagram(this,\'wide\')">↔ Wide</button></div>';
-        const c = document.createElement('div'); c.className = 'mermaid'; c.textContent = d.diagram; b.appendChild(c);
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = '<div class="diagram-controls"><button onclick="zoomDiagram(this,1.2)">🔍+</button><button onclick="zoomDiagram(this,0.8)">🔍−</button><button onclick="zoomDiagram(this,\'fit\')">↩ Fit</button><button onclick="zoomDiagram(this,\'wide\')">↔ Wide</button></div>';
+        const c = document.createElement('div'); c.className = 'mermaid'; c.textContent = d.diagram; wrapper.appendChild(c); b.appendChild(wrapper);
         try { await mermaid.run({ nodes: [c] }); } catch (e) {}
         c.querySelectorAll('svg').forEach(svg => initMermaidSvg(svg, c));
         scrollBottom();
