@@ -15,6 +15,7 @@ from agents.interview_coach import interview_coach
 from agents.architect import architecture_advisor
 from agents.comparator import compare
 from agents.diagram import diagram
+from agents.lineage_agent import lineage_query
 from agents.quality_checker import quality_check
 from memory import save_turn, get_history
 from guardrails import check_input
@@ -33,6 +34,7 @@ SPECIALISTS = {
     "architecture": architecture_advisor,
     "compare": compare,
     "diagram": diagram,
+    "lineage": lineage_query,
     "fallback": fallback,
 }
 
