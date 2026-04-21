@@ -1,3 +1,4 @@
+from observability import track
 """Interview Coach agent - helps prepare structured answers for Ricoh interviews."""
 
 import os
@@ -34,6 +35,7 @@ COACH_PROMPT = ChatPromptTemplate.from_template(
 )
 
 
+@track("interview_coach")
 def interview_coach(state: AgentState) -> AgentState:
     result = (COACH_PROMPT | _get_llm()).invoke({
         "context": state["context"],

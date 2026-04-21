@@ -4,152 +4,96 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ricoh AI Architect Selection</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --ricoh-red: #cc0000;
-            --ricoh-dark: #1a1a2e;
-            --bg: #f7f8fa;
-            --card: #ffffff;
-            --border: #e5e7eb;
-            --text: #1f2937;
-            --text-muted: #6b7280;
-            --accent: #3b82f6;
-        }
+        :root { --red: #cc0000; --dark: #1a1a2e; --bg: #f7f8fa; --card: #fff; --border: #e5e7eb; --text: #1f2937; --muted: #6b7280; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); height: 100vh; display: flex; flex-direction: column; color: var(--text); }
-
-        /* Header */
-        header {
-            background: linear-gradient(135deg, var(--ricoh-dark) 0%, #16213e 100%);
-            color: white; padding: 0.8rem 2rem; display: flex; align-items: center; justify-content: space-between;
-            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-        }
-        .header-left { display: flex; align-items: center; gap: 0.8rem; }
-        .logo { width: 36px; height: 36px; background: var(--ricoh-red); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
-        header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: -0.3px; }
-        .header-sub { font-size: 0.65rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
-        .header-right { display: flex; align-items: center; gap: 0.6rem; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); height: 100vh; display: flex; flex-direction: column; color: var(--text); }
+        header { background: linear-gradient(135deg, var(--dark), #16213e); color: #fff; padding: .8rem 2rem; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 12px rgba(0,0,0,.15); }
+        .header-left { display: flex; align-items: center; gap: .8rem; }
+        .logo { width: 36px; height: 36px; background: var(--red); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        header h1 { font-size: 1.1rem; font-weight: 600; }
+        .header-sub { font-size: .65rem; color: rgba(255,255,255,.5); margin-top: 2px; }
+        .header-right { display: flex; align-items: center; gap: .6rem; }
         .status-dot { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .status-text { font-size: 0.7rem; color: rgba(255,255,255,0.6); }
-        .badge { background: var(--ricoh-red); padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; letter-spacing: 0.5px; }
-
-        /* Main layout */
+        @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.5 } }
+        .status-text { font-size: .7rem; color: rgba(255,255,255,.6); }
+        .hbadge { background: var(--red); padding: .2rem .6rem; border-radius: 4px; font-size: .65rem; font-weight: 600; }
         .main { flex: 1; display: flex; overflow: hidden; }
-
-        /* Sidebar */
-        .sidebar {
-            width: 240px; background: var(--card); border-right: 1px solid var(--border);
-            padding: 1.2rem; display: flex; flex-direction: column; gap: 1rem;
-            overflow-y: auto; flex-shrink: 0;
-        }
-        .sidebar h3 { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; }
-        .agent-list { display: flex; flex-direction: column; gap: 0.35rem; }
-        .agent-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 6px; font-size: 0.78rem; color: var(--text-muted); }
+        .sidebar { width: 240px; background: var(--card); border-right: 1px solid var(--border); padding: 1.2rem; display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; flex-shrink: 0; }
+        .sidebar h3 { font-size: .65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 600; }
+        .agent-list { display: flex; flex-direction: column; gap: .35rem; }
+        .agent-item { display: flex; align-items: center; gap: .5rem; padding: .4rem .5rem; border-radius: 6px; font-size: .78rem; color: var(--muted); transition: all .2s; }
         .agent-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-        .agent-item.active { background: #fef2f2; color: var(--ricoh-red); font-weight: 500; }
-        .dot-rag { background: #3b82f6; } .dot-summarize { background: #8b5cf6; }
-        .dot-interview { background: #f59e0b; } .dot-architecture { background: #10b981; }
-        .dot-compare { background: #ec4899; } .dot-fallback { background: #6b7280; }
-        .dot-diagram { background: #06b6d4; }
-        .dot-quality { background: #22c55e; }
+        .agent-item.active { background: #fef2f2; color: var(--red); font-weight: 500; }
+        .d-guard { background: #ef4444; } .d-rag { background: #3b82f6; } .d-sum { background: #8b5cf6; }
+        .d-int { background: #f59e0b; } .d-arch { background: #10b981; } .d-cmp { background: #ec4899; }
+        .d-dia { background: #06b6d4; } .d-fb { background: #6b7280; } .d-qc { background: #22c55e; }
         .tech-section { margin-top: auto; }
-        .tech-tag { display: inline-block; background: var(--bg); border: 1px solid var(--border); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.6rem; color: var(--text-muted); margin: 0.1rem; }
-
-        /* Chat area */
+        .tech-tag { display: inline-block; background: var(--bg); border: 1px solid var(--border); padding: .15rem .4rem; border-radius: 4px; font-size: .6rem; color: var(--muted); margin: .1rem; }
+        .sidebar-btn { width: 100%; font-size: .7rem; padding: .4rem; border-radius: 6px; background: var(--dark); border: none; color: #fff; cursor: pointer; margin-top: .4rem; }
+        .sidebar-btn:hover { background: #2d2d4e; }
         .chat-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
         .chat-container { flex: 1; overflow-y: auto; padding: 1.5rem 2rem; }
-        .message { margin-bottom: 1.2rem; display: flex; gap: 0.6rem; max-width: 720px; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .message { margin-bottom: 1.2rem; display: flex; gap: .6rem; max-width: 720px; animation: fadeIn .3s ease; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(8px) } to { opacity:1; transform:translateY(0) } }
         .message.user { flex-direction: row-reverse; margin-left: auto; }
         .message.wide { max-width: 100%; }
-        .message .bubble { max-width: 85%; padding: 0.9rem 1.1rem; border-radius: 12px; line-height: 1.65; font-size: 0.9rem; }
+        .bubble { max-width: 85%; padding: .9rem 1.1rem; border-radius: 12px; line-height: 1.65; font-size: .9rem; }
         .message.wide .bubble { max-width: 100%; width: 100%; }
-        .message.user .bubble { background: var(--ricoh-red); color: white; border-bottom-right-radius: 4px; }
-        .message.assistant .bubble { background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
-        .message .avatar {
-            width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center;
-            justify-content: center; font-size: 0.7rem; font-weight: 600; flex-shrink: 0;
-        }
-        .message.user .avatar { background: #991b1b; color: white; }
-        .message.assistant .avatar { background: var(--ricoh-dark); color: white; }
-
-        /* Input */
-        .input-area { border-top: 1px solid var(--border); padding: 0.8rem 2rem; background: var(--card); }
-        .input-wrapper { max-width: 720px; display: flex; gap: 0.5rem; }
-        input[type="text"] {
-            flex: 1; padding: 0.7rem 1rem; border: 1px solid var(--border); border-radius: 10px;
-            font-size: 0.9rem; outline: none; font-family: inherit; transition: border-color 0.2s;
-        }
-        input[type="text"]:focus { border-color: var(--ricoh-red); box-shadow: 0 0 0 3px rgba(204,0,0,0.08); }
-        button {
-            background: var(--ricoh-red); color: white; border: none; padding: 0.7rem 1.4rem;
-            border-radius: 10px; cursor: pointer; font-size: 0.9rem; font-weight: 500;
-            font-family: inherit; transition: background 0.2s;
-        }
+        .message.user .bubble { background: var(--red); color: #fff; border-bottom-right-radius: 4px; }
+        .message.assistant .bubble { background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+        .avatar { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 600; flex-shrink: 0; }
+        .message.user .avatar { background: #991b1b; color: #fff; }
+        .message.assistant .avatar { background: var(--dark); color: #fff; }
+        .input-area { border-top: 1px solid var(--border); padding: .8rem 2rem; background: var(--card); }
+        .input-wrapper { max-width: 720px; display: flex; gap: .5rem; }
+        input[type="text"] { flex: 1; padding: .7rem 1rem; border: 1px solid var(--border); border-radius: 10px; font-size: .9rem; outline: none; font-family: inherit; }
+        input[type="text"]:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(204,0,0,.08); }
+        button { background: var(--red); color: #fff; border: none; padding: .7rem 1.4rem; border-radius: 10px; cursor: pointer; font-size: .9rem; font-weight: 500; font-family: inherit; }
         button:hover { background: #b91c1c; }
         button:disabled { background: #d1d5db; cursor: not-allowed; }
-        .typing { opacity: 0.5; font-style: italic; }
-
-        /* Agent badge */
-        .agent-badge {
-            display: inline-block; background: var(--ricoh-dark); color: #8be9fd;
-            font-size: 0.65rem; padding: 0.15rem 0.5rem; border-radius: 4px;
-            font-family: 'SF Mono', Consolas, monospace; margin-bottom: 0.5rem; letter-spacing: 0.3px;
-        }
-
-        .reasoning-box {
-            margin-bottom: 0.5rem; padding: 0.4rem 0.7rem; background: #eff6ff;
-            border-radius: 6px; border-left: 3px solid #3b82f6; font-size: 0.75rem; color: #1e40af;
-            cursor: pointer; user-select: none;
-        }
-        .reasoning-box .label { font-weight: 600; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        .reasoning-box .text { margin-top: 0.2rem; font-style: italic; color: #1e3a5f; }
-
-        /* Quality bar */
-        .quality-bar {
-            margin-top: 0.7rem; padding: 0.6rem 0.8rem; background: #f8fafb;
-            border-radius: 8px; border: 1px solid #e9ecef;
-        }
-        .quality-header { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
-        .quality-header .icon { font-size: 0.8rem; }
-        .quality-header .title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; color: var(--ricoh-dark); }
-        .quality-scores { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
-        .metric { display: flex; align-items: center; gap: 0.2rem; font-size: 0.72rem; }
-        .metric-label { color: var(--text-muted); }
-        .stars { color: #f59e0b; letter-spacing: -1px; font-size: 0.8rem; }
-        .quality-note { color: var(--text-muted); font-style: italic; margin-top: 0.3rem; font-size: 0.7rem; }
-        .overall-badge { display: inline-flex; align-items: center; gap: 0.2rem; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 700; font-size: 0.75rem; font-family: monospace; }
-        .overall-5, .overall-4 { background: #dcfce7; color: #166534; }
+        .typing { opacity: .5; font-style: italic; }
+        .agent-badge { display: inline-block; background: var(--dark); color: #8be9fd; font-size: .65rem; padding: .15rem .5rem; border-radius: 4px; font-family: monospace; margin-bottom: .5rem; }
+        .reasoning-box { margin-bottom: .5rem; padding: .4rem .7rem; background: #eff6ff; border-radius: 6px; border-left: 3px solid #3b82f6; font-size: .75rem; color: #1e40af; }
+        .reasoning-box .label { font-weight: 600; font-size: .65rem; text-transform: uppercase; letter-spacing: .5px; }
+        .reasoning-box .text { margin-top: .2rem; font-style: italic; color: #1e3a5f; }
+        .warning-box { margin-bottom: .5rem; padding: .4rem .7rem; background: #fef9c3; border-radius: 6px; border-left: 3px solid #f59e0b; font-size: .75rem; color: #854d0e; }
+        .quality-bar { margin-top: .7rem; padding: .6rem .8rem; background: #f8fafb; border-radius: 8px; border: 1px solid #e9ecef; }
+        .quality-header { display: flex; align-items: center; gap: .4rem; margin-bottom: .4rem; }
+        .quality-header .title { font-size: .65rem; text-transform: uppercase; letter-spacing: .8px; font-weight: 600; color: var(--dark); }
+        .quality-scores { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+        .metric { display: flex; align-items: center; gap: .2rem; font-size: .72rem; }
+        .metric-label { color: var(--muted); }
+        .stars { color: #f59e0b; letter-spacing: -1px; font-size: .8rem; }
+        .quality-note { color: var(--muted); font-style: italic; margin-top: .3rem; font-size: .7rem; }
+        .overall-badge { display: inline-flex; padding: .2rem .5rem; border-radius: 6px; font-weight: 700; font-size: .75rem; font-family: monospace; }
+        .overall-5,.overall-4 { background: #dcfce7; color: #166534; }
         .overall-3 { background: #fef9c3; color: #854d0e; }
-        .overall-2, .overall-1 { background: #fee2e2; color: #991b1b; }
-
-        /* Markdown */
-        .bubble h1, .bubble h2, .bubble h3 { margin: 0.6rem 0 0.3rem; }
-        .bubble h1 { font-size: 1.05rem; } .bubble h2 { font-size: 0.95rem; } .bubble h3 { font-size: 0.9rem; }
-        .bubble p { margin: 0.3rem 0; }
-        .bubble ul, .bubble ol { margin: 0.3rem 0 0.3rem 1.3rem; }
-        .bubble li { margin: 0.15rem 0; }
+        .overall-2,.overall-1 { background: #fee2e2; color: #991b1b; }
+        .trace-bar { margin-top: .5rem; padding: .4rem .7rem; background: #f0fdf4; border-radius: 6px; border: 1px solid #bbf7d0; font-size: .68rem; font-family: monospace; color: #166534; }
+        .trace-bar .trace-title { font-weight: 600; font-size: .6rem; text-transform: uppercase; letter-spacing: .5px; margin-bottom: .2rem; }
+        .trace-items { display: flex; gap: .6rem; flex-wrap: wrap; }
+        .feedback-row { display: flex; gap: .4rem; margin-top: .5rem; align-items: center; }
+        .feedback-label { font-size: .65rem; color: var(--muted); }
+        .fb-btn { background: none; border: 1px solid var(--border); border-radius: 6px; padding: .2rem .5rem; cursor: pointer; font-size: .8rem; color: var(--muted); transition: all .2s; }
+        .fb-btn:hover { border-color: var(--red); color: var(--red); background: #fef2f2; }
+        .fb-btn.sel { border-color: var(--red); color: var(--red); background: #fef2f2; pointer-events: none; }
+        .bubble h1,.bubble h2,.bubble h3 { margin: .6rem 0 .3rem; }
+        .bubble h1 { font-size: 1.05rem; } .bubble h2 { font-size: .95rem; } .bubble h3 { font-size: .9rem; }
+        .bubble p { margin: .3rem 0; } .bubble ul,.bubble ol { margin: .3rem 0 .3rem 1.3rem; } .bubble li { margin: .15rem 0; }
         .bubble strong { font-weight: 600; }
-        .bubble code { background: #f3f4f6; padding: 0.1rem 0.35rem; border-radius: 4px; font-size: 0.82em; font-family: 'SF Mono', Consolas, monospace; }
-        .bubble pre { background: var(--ricoh-dark); color: #f8f8f2; padding: 0.7rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; font-size: 0.82rem; }
+        .bubble code { background: #f3f4f6; padding: .1rem .35rem; border-radius: 4px; font-size: .82em; font-family: monospace; }
+        .bubble pre { background: var(--dark); color: #f8f8f2; padding: .7rem; border-radius: 8px; overflow-x: auto; margin: .5rem 0; font-size: .82rem; }
         .bubble pre code { background: none; color: inherit; padding: 0; }
-        .bubble table { border-collapse: collapse; margin: 0.5rem 0; width: 100%; font-size: 0.82rem; }
-        .bubble th, .bubble td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; }
+        .bubble table { border-collapse: collapse; margin: .5rem 0; width: 100%; font-size: .82rem; }
+        .bubble th,.bubble td { border: 1px solid var(--border); padding: .4rem .6rem; text-align: left; }
         .bubble th { background: var(--bg); font-weight: 600; }
-        .bubble hr { border: none; border-top: 1px solid var(--border); margin: 0.6rem 0; }
-        .bubble blockquote { border-left: 3px solid var(--ricoh-red); padding-left: 0.8rem; margin: 0.4rem 0; color: var(--text-muted); }
-        .bubble .mermaid { background: #f8fafb; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: 0.5rem 0; overflow-x: auto; text-align: center; }
-        .bubble .mermaid svg { max-width: 100%; height: auto; display: inline-block; }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .sidebar { display: none; }
-            .chat-container { padding: 1rem; }
-            .input-area { padding: 0.6rem 1rem; }
-        }
+        .bubble hr { border: none; border-top: 1px solid var(--border); margin: .6rem 0; }
+        .bubble blockquote { border-left: 3px solid var(--red); padding-left: .8rem; margin: .4rem 0; color: var(--muted); }
+        .bubble .mermaid { background: #f8fafb; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: .5rem 0; overflow-x: auto; text-align: center; }
+        .bubble .mermaid svg { max-width: 100%; height: auto; }
+        @media (max-width: 768px) { .sidebar { display: none; } .chat-container { padding: 1rem; } .input-area { padding: .6rem 1rem; } }
     </style>
 </head>
 <body>
@@ -158,50 +102,44 @@
             <div class="logo">🤖</div>
             <div>
                 <h1>Ricoh AI Architect Selection</h1>
-                <div class="header-sub">Multi-Agent RAG System · LangGraph Orchestration</div>
+                <div class="header-sub">Multi-Agent RAG · LangGraph · Guardrails · Observability</div>
             </div>
         </div>
         <div class="header-right">
             <div class="status-dot"></div>
             <span class="status-text">Online</span>
-            <span class="badge">PoC DEMO</span>
+            <span class="hbadge">PoC DEMO</span>
         </div>
     </header>
-
     <div class="main">
         <aside class="sidebar">
             <div>
                 <h3>Agents</h3>
                 <div class="agent-list" id="agentList">
-                    <div class="agent-item" data-agent="rag"><span class="dot dot-rag"></span> RAG Knowledge</div>
-                    <div class="agent-item" data-agent="summarize"><span class="dot dot-summarize"></span> Summarizer</div>
-                    <div class="agent-item" data-agent="interview"><span class="dot dot-interview"></span> Interview Coach</div>
-                    <div class="agent-item" data-agent="architecture"><span class="dot dot-architecture"></span> Architecture Advisor</div>
-                    <div class="agent-item" data-agent="compare"><span class="dot dot-compare"></span> Comparator</div>
-                    <div class="agent-item" data-agent="diagram"><span class="dot dot-diagram"></span> Diagram Generator</div>
-                    <div class="agent-item" data-agent="fallback"><span class="dot dot-fallback"></span> Fallback</div>
-                    <div class="agent-item" data-agent="quality_check"><span class="dot dot-quality"></span> Quality Checker</div>
+                    <div class="agent-item" data-agent="guardrails"><span class="dot d-guard"></span> Guardrails</div>
+                    <div class="agent-item" data-agent="rag"><span class="dot d-rag"></span> RAG Knowledge</div>
+                    <div class="agent-item" data-agent="summarize"><span class="dot d-sum"></span> Summarizer</div>
+                    <div class="agent-item" data-agent="interview"><span class="dot d-int"></span> Interview Coach</div>
+                    <div class="agent-item" data-agent="architecture"><span class="dot d-arch"></span> Architecture Advisor</div>
+                    <div class="agent-item" data-agent="compare"><span class="dot d-cmp"></span> Comparator</div>
+                    <div class="agent-item" data-agent="diagram"><span class="dot d-dia"></span> Diagram Generator</div>
+                    <div class="agent-item" data-agent="fallback"><span class="dot d-fb"></span> Fallback</div>
+                    <div class="agent-item" data-agent="quality_check"><span class="dot d-qc"></span> Quality Checker</div>
                 </div>
             </div>
             <div class="tech-section">
                 <h3>Tech Stack</h3>
-                <div style="margin-top:0.4rem">
-                    <span class="tech-tag">Claude Sonnet 4</span>
-                    <span class="tech-tag">Azure AI Foundry</span>
-                    <span class="tech-tag">Azure OpenAI</span>
-                    <span class="tech-tag">LangChain</span>
-                    <span class="tech-tag">LangGraph</span>
-                    <span class="tech-tag">pgvector</span>
-                    <span class="tech-tag">Azure ML</span>
-                    <span class="tech-tag">Azure Functions</span>
-                    <span class="tech-tag">Container Apps</span>
-                    <span class="tech-tag">Static Web Apps</span>
-                    <span class="tech-tag">GitHub Actions</span>
-                    <span class="tech-tag">Bicep IaC</span>
+                <div style="margin-top:.4rem">
+                    <span class="tech-tag">Claude Sonnet 4</span><span class="tech-tag">Azure AI Foundry</span><span class="tech-tag">Azure OpenAI</span>
+                    <span class="tech-tag">LangChain</span><span class="tech-tag">LangGraph</span><span class="tech-tag">pgvector</span>
+                    <span class="tech-tag">Cosmos DB</span><span class="tech-tag">Azure ML</span><span class="tech-tag">Azure Functions</span>
+                    <span class="tech-tag">Container Apps</span><span class="tech-tag">Static Web Apps</span><span class="tech-tag">GitHub Actions</span>
+                    <span class="tech-tag">Bicep IaC</span><span class="tech-tag">OpenTelemetry</span>
                 </div>
+                <button class="sidebar-btn" onclick="showArchitecture()">📐 Live Architecture</button>
+                <button class="sidebar-btn" onclick="showMetrics()" style="background:#166534">📊 Agent Metrics</button>
             </div>
         </aside>
-
         <div class="chat-area">
             <div class="chat-container" id="chat">
                 <div class="message assistant">
@@ -217,11 +155,11 @@
                             <li>📊 <strong>Diagrammi</strong> architetturali da prompt</li>
                             <li>📝 <strong>Riassunti</strong> di argomenti complessi</li>
                         </ul>
-                        <br>Ogni risposta viene verificata da un <strong>Quality Checker</strong> automatico.
+                        <br>🛡️ <strong>Guardrails</strong> attivi (anti-injection, PII detection).<br>
+                        Ogni risposta verificata da <strong>Quality Checker</strong> + 👍/👎 feedback.
                     </div>
                 </div>
             </div>
-
             <div class="input-area">
                 <div class="input-wrapper">
                     <input type="text" id="input" placeholder="Chiedi qualcosa su Ricoh Italia..." onkeypress="if(event.key==='Enter')send()">
@@ -230,158 +168,103 @@
             </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
-        const API_URL = 'https://agent-ricoh.purpleocean-d135007c.eastus2.azurecontainerapps.io/api/chat';
+        const BASE = 'https://agent-ricoh.purpleocean-d135007c.eastus2.azurecontainerapps.io';
         marked.setOptions({ breaks: true, gfm: true });
+        let SID = localStorage.getItem('ricoh_session') || crypto.randomUUID();
+        localStorage.setItem('ricoh_session', SID);
 
-        // Persistent session
-        let SESSION_ID = localStorage.getItem('ricoh_session') || crypto.randomUUID();
-        localStorage.setItem('ricoh_session', SESSION_ID);
-
-        function highlightAgent(name) {
-            document.querySelectorAll('.agent-item').forEach(el => el.classList.remove('active'));
-            if (name) {
-                const el = document.querySelector(`.agent-item[data-agent="${name}"]`);
-                if (el) el.classList.add('active');
-            }
+        function hl(n) { document.querySelectorAll('.agent-item').forEach(e=>e.classList.remove('active')); if(n){const e=document.querySelector(`.agent-item[data-agent="${n}"]`);if(e)e.classList.add('active');} }
+        function esc(t) { const d=document.createElement('div');d.textContent=t;return d.innerHTML; }
+        function addMsg(role, html) {
+            const c=document.getElementById('chat'), d=document.createElement('div');
+            d.className=`message ${role}`;
+            d.innerHTML=`<div class="avatar">${role==='user'?'Tu':'AI'}</div><div class="bubble">${html}</div>`;
+            c.appendChild(d); c.scrollTop=c.scrollHeight; return d;
         }
-
-        function addMessage(role, html) {
-            const chat = document.getElementById('chat');
-            const div = document.createElement('div');
-            div.className = `message ${role}`;
-            div.innerHTML = `
-                <div class="avatar">${role === 'user' ? 'Tu' : 'AI'}</div>
-                <div class="bubble">${html}</div>
-            `;
-            chat.appendChild(div);
-            chat.scrollTop = chat.scrollHeight;
-            return div;
+        function renderQ(q) {
+            const s=n=>'★'.repeat(Math.min(n,5))+'☆'.repeat(Math.max(5-n,0));
+            const oc=q.overall>=4?`overall-${q.overall}`:q.overall>=3?'overall-3':'overall-1';
+            return `<div class="quality-bar"><div class="quality-header"><span>✅</span><span class="title">Quality Check · LLM-as-Judge</span></div>
+            <div class="quality-scores"><span class="overall-badge ${oc}">${q.overall}/5</span>
+            <span class="metric"><span class="metric-label">Rilevanza</span><span class="stars">${s(q.relevance)}</span></span>
+            <span class="metric"><span class="metric-label">Accuratezza</span><span class="stars">${s(q.accuracy)}</span></span>
+            <span class="metric"><span class="metric-label">Completezza</span><span class="stars">${s(q.completeness)}</span></span>
+            <span class="metric"><span class="metric-label">Chiarezza</span><span class="stars">${s(q.clarity)}</span></span></div>
+            ${q.note?`<div class="quality-note">"${q.note}"</div>`:''}</div>`;
         }
-
-        function escapeHtml(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-
-        function renderQuality(q) {
-            const stars = n => '★'.repeat(Math.min(n,5)) + '☆'.repeat(Math.max(5-n,0));
-            const oc = q.overall >= 4 ? `overall-${q.overall}` : q.overall >= 3 ? 'overall-3' : 'overall-1';
-            return `
-                <div class="quality-bar" style="animation: fadeIn 0.3s ease">
-                    <div class="quality-header">
-                        <span class="icon">✅</span>
-                        <span class="title">Quality Check · LLM-as-Judge</span>
-                    </div>
-                    <div class="quality-scores">
-                        <span class="overall-badge ${oc}">${q.overall}/5</span>
-                        <span class="metric"><span class="metric-label">Rilevanza</span> <span class="stars">${stars(q.relevance)}</span></span>
-                        <span class="metric"><span class="metric-label">Accuratezza</span> <span class="stars">${stars(q.accuracy)}</span></span>
-                        <span class="metric"><span class="metric-label">Completezza</span> <span class="stars">${stars(q.completeness)}</span></span>
-                        <span class="metric"><span class="metric-label">Chiarezza</span> <span class="stars">${stars(q.clarity)}</span></span>
-                    </div>
-                    ${q.note ? `<div class="quality-note">"${q.note}"</div>` : ''}
-                </div>`;
-        }
-
-        async function send() {
-            const input = document.getElementById('input');
-            const btn = document.getElementById('btn');
-            const query = input.value.trim();
-            if (!query) return;
-
-            addMessage('user', escapeHtml(query));
-            input.value = '';
-            btn.disabled = true;
-            highlightAgent(null);
-
-            const msg = addMessage('assistant', '<span class="typing">⏳ Routing query to the best agent...</span>');
-            const bubble = msg.querySelector('.bubble');
-
+        async function showArchitecture() {
             try {
-                const res = await fetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query, session_id: SESSION_ID }),
-                });
-
-                const reader = res.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = '';
-                let badgeHtml = '', reasoningHtml = '', responseHtml = '';
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-
-                    // Parse SSE events from buffer
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop(); // keep incomplete line
-
-                    let eventType = '';
-                    for (const line of lines) {
-                        if (line.startsWith('event: ')) {
-                            eventType = line.slice(7).trim();
-                        } else if (line.startsWith('data: ') && eventType) {
-                            try {
-                                const data = JSON.parse(line.slice(6));
-
-                                if (eventType === 'routing') {
-                                    highlightAgent(data.agent);
-                                    badgeHtml = data.agent ? `<span class="agent-badge">🤖 ${data.agent}</span> ` : '';
-                                    if (data.reasoning) {
-                                        reasoningHtml = `
-                                            <div class="reasoning-box">
-                                                <div class="label">🧠 Reasoning</div>
-                                                <div class="text">${escapeHtml(data.reasoning)}</div>
-                                            </div>`;
-                                    }
-                                    bubble.innerHTML = badgeHtml + reasoningHtml + '<span class="typing">✍️ Generating response...</span>';
-                                    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
-                                }
-                                else if (eventType === 'response') {
-                                    responseHtml = marked.parse(data.text);
-                                    const hasMermaid = data.text.includes('```mermaid');
-                                    if (hasMermaid) msg.classList.add('wide');
-                                    bubble.innerHTML = badgeHtml + reasoningHtml + responseHtml + '<div id="quality-placeholder" class="typing" style="margin-top:0.5rem">🔍 Quality check in corso...</div>';
-                                    // Render mermaid diagrams
-                                    bubble.querySelectorAll('code.language-mermaid').forEach((el) => {
-                                        const pre = el.parentElement;
-                                        const container = document.createElement('div');
-                                        container.className = 'mermaid';
-                                        container.textContent = el.textContent;
-                                        pre.replaceWith(container);
-                                    });
-                                    try { await mermaid.run({ nodes: bubble.querySelectorAll('.mermaid') }); } catch(e) {}
-                                    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
-                                }
-                                else if (eventType === 'quality') {
-                                    highlightAgent('quality_check');
-                                    // Remove the placeholder, append quality without destroying rendered content
-                                    const placeholder = bubble.querySelector('#quality-placeholder');
-                                    if (placeholder) placeholder.remove();
-                                    if (data.quality) {
-                                        const qDiv = document.createElement('div');
-                                        qDiv.innerHTML = renderQuality(data.quality);
-                                        bubble.appendChild(qDiv.firstElementChild);
-                                    }
-                                    document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
-                                }
-                                else if (eventType === 'error') {
-                                    bubble.innerHTML = `<em>Errore: ${escapeHtml(data.message)}</em>`;
-                                }
-                            } catch (e) { /* skip malformed JSON */ }
-                            eventType = '';
+                const r=await fetch(BASE+'/api/architecture'), d=await r.json(), m=addMsg('assistant','<span class="agent-badge">📐 architecture</span> ');
+                m.classList.add('wide'); const b=m.querySelector('.bubble'), c=document.createElement('div');
+                c.className='mermaid'; c.textContent=d.diagram; b.appendChild(c);
+                try{await mermaid.run({nodes:[c]})}catch(e){} document.getElementById('chat').scrollTop=9999;
+            } catch(e){addMsg('assistant',`<em>Errore: ${e.message}</em>`);}
+        }
+        async function showMetrics() {
+            try {
+                const r=await fetch(BASE+'/api/metrics'), d=await r.json();
+                let html='<span class="agent-badge">📊 metrics</span><h3>Agent Performance</h3><table><tr><th>Agent</th><th>Calls</th><th>Avg (ms)</th><th>Last (ms)</th><th>Errors</th></tr>';
+                for(const[k,v]of Object.entries(d.agents||{})) html+=`<tr><td>${k}</td><td>${v.calls}</td><td>${v.avg_ms}</td><td>${v.last_ms}</td><td>${v.errors}</td></tr>`;
+                html+='</table>';
+                if(d.feedback) html+=`<br><strong>Feedback:</strong> 👍 ${d.feedback.thumbs_up} · 👎 ${d.feedback.thumbs_down}`;
+                addMsg('assistant', html);
+            } catch(e){addMsg('assistant',`<em>Errore: ${e.message}</em>`);}
+        }
+        async function sendFb(mid, rating, btn) {
+            btn.classList.add('sel'); btn.parentElement.querySelectorAll('.fb-btn').forEach(b=>{if(b!==btn)b.style.opacity='.3';});
+            try{await fetch(BASE+'/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:SID,message_id:mid,rating})})}catch(e){}
+        }
+        async function send() {
+            const inp=document.getElementById('input'), btn=document.getElementById('btn'), q=inp.value.trim();
+            if(!q)return; addMsg('user',esc(q)); inp.value=''; btn.disabled=true; hl(null);
+            const msg=addMsg('assistant','<span class="typing">⏳ Guardrails check...</span>'), bub=msg.querySelector('.bubble');
+            try {
+                const res=await fetch(BASE+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q,session_id:SID})});
+                const reader=res.body.getReader(), dec=new TextDecoder(); let buf='',badge='',reason='',resp='',mid='';
+                while(true) {
+                    const{done,value}=await reader.read(); if(done)break;
+                    buf+=dec.decode(value,{stream:true}); const lines=buf.split('\n'); buf=lines.pop();
+                    let ev='';
+                    for(const ln of lines) {
+                        if(ln.startsWith('event: ')){ev=ln.slice(7).trim();}
+                        else if(ln.startsWith('data: ')&&ev){
+                            try{const d=JSON.parse(ln.slice(6));
+                                if(ev==='routing'){
+                                    mid=d.message_id||''; hl('guardrails'); setTimeout(()=>hl(d.agent),300);
+                                    badge=d.agent?`<span class="agent-badge">🤖 ${d.agent}</span> `:'';
+                                    if(d.reasoning) reason=`<div class="reasoning-box"><div class="label">🧠 Reasoning</div><div class="text">${esc(d.reasoning)}</div></div>`;
+                                    bub.innerHTML=badge+reason+'<span class="typing">✍️ Generating response...</span>';
+                                    document.getElementById('chat').scrollTop=9999;
+                                } else if(ev==='warning'){
+                                    const w=document.createElement('div');w.className='warning-box';w.textContent=d.message;bub.prepend(w);
+                                } else if(ev==='response'){
+                                    resp=marked.parse(d.text); if(d.text.includes('```mermaid'))msg.classList.add('wide');
+                                    bub.innerHTML=badge+reason+resp+'<div id="qp" class="typing" style="margin-top:.5rem">🔍 Quality check...</div>';
+                                    bub.querySelectorAll('code.language-mermaid').forEach(el=>{const p=el.parentElement,c=document.createElement('div');c.className='mermaid';c.textContent=el.textContent;p.replaceWith(c);});
+                                    try{await mermaid.run({nodes:bub.querySelectorAll('.mermaid')})}catch(e){}
+                                    document.getElementById('chat').scrollTop=9999;
+                                } else if(ev==='quality'){
+                                    hl('quality_check'); const p=bub.querySelector('#qp');if(p)p.remove();
+                                    if(d.quality){const qd=document.createElement('div');qd.innerHTML=renderQ(d.quality);bub.appendChild(qd.firstElementChild);}
+                                    document.getElementById('chat').scrollTop=9999;
+                                } else if(ev==='trace'){
+                                    if(d.metrics){const items=Object.entries(d.metrics).filter(([,v])=>v.last_ms>0).map(([k,v])=>`<span>${k}:<strong>${v.last_ms}ms</strong></span>`).join(' · ');
+                                    if(items){const t=document.createElement('div');t.innerHTML=`<div class="trace-bar"><div class="trace-title">⏱️ Trace</div><div class="trace-items">${items}</div></div>`;bub.appendChild(t.firstElementChild);}}
+                                } else if(ev==='done'){
+                                    const fb=document.createElement('div');fb.className='feedback-row';
+                                    fb.innerHTML=`<span class="feedback-label">Utile?</span><button class="fb-btn" onclick="sendFb('${mid}','thumbs_up',this)">👍</button><button class="fb-btn" onclick="sendFb('${mid}','thumbs_down',this)">👎</button>`;
+                                    bub.appendChild(fb); document.getElementById('chat').scrollTop=9999;
+                                } else if(ev==='error'){bub.innerHTML=`<em>🛡️ ${esc(d.message)}</em>`;}
+                            }catch(e){} ev='';
                         }
                     }
                 }
-            } catch (e) {
-                bubble.innerHTML = `<em>Errore: ${escapeHtml(e.message)}</em>`;
-            }
-            btn.disabled = false;
-            input.focus();
+            } catch(e){bub.innerHTML=`<em>Errore: ${esc(e.message)}</em>`;}
+            btn.disabled=false; inp.focus();
         }
     </script>
 </body>

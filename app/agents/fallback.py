@@ -1,3 +1,4 @@
+from observability import track
 """Fallback agent node - handles greetings and off-topic queries."""
 
 import os
@@ -28,6 +29,7 @@ FALLBACK_PROMPT = ChatPromptTemplate.from_template(
 )
 
 
+@track("fallback")
 def fallback(state: AgentState) -> AgentState:
     result = (FALLBACK_PROMPT | _get_llm()).invoke({"question": state["question"]})
     return {**state, "response": result.content}

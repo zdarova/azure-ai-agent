@@ -1,3 +1,4 @@
+from observability import track
 """Retriever node - fetches relevant documents from pgvector."""
 
 import os
@@ -33,6 +34,7 @@ def _get_vectorstore():
     return _vectorstore
 
 
+@track("retriever")
 def retrieve(state: AgentState) -> AgentState:
     docs = _get_vectorstore().similarity_search(state["question"], k=4)
     context = "\n\n".join(d.page_content for d in docs)

@@ -1,3 +1,4 @@
+from observability import track
 """Comparator agent - compares Ricoh solutions/technologies side by side."""
 
 import os
@@ -32,6 +33,7 @@ COMPARE_PROMPT = ChatPromptTemplate.from_template(
 )
 
 
+@track("comparator")
 def compare(state: AgentState) -> AgentState:
     result = (COMPARE_PROMPT | _get_llm()).invoke({
         "context": state["context"],

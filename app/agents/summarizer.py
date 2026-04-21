@@ -1,3 +1,4 @@
+from observability import track
 """Summarizer agent node - condenses retrieved context into a concise summary."""
 
 import os
@@ -28,6 +29,7 @@ SUMMARIZE_PROMPT = ChatPromptTemplate.from_template(
 )
 
 
+@track("summarizer")
 def summarize(state: AgentState) -> AgentState:
     result = (SUMMARIZE_PROMPT | _get_llm()).invoke({
         "context": state["context"],

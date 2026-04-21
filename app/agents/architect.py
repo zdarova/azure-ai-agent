@@ -1,3 +1,4 @@
+from observability import track
 """Architecture Advisor agent - proposes Azure AI architectures using Ricoh's stack."""
 
 import os
@@ -35,6 +36,7 @@ ARCH_PROMPT = ChatPromptTemplate.from_template(
 )
 
 
+@track("architect")
 def architecture_advisor(state: AgentState) -> AgentState:
     result = (ARCH_PROMPT | _get_llm()).invoke({
         "context": state["context"],

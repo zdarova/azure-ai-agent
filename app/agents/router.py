@@ -1,3 +1,4 @@
+from observability import track
 """Router node - classifies query intent with reasoning."""
 
 import os
@@ -38,6 +39,7 @@ ROUTER_PROMPT = ChatPromptTemplate.from_template(
 )
 
 
+@track("router")
 def route(state: AgentState) -> AgentState:
     result = (ROUTER_PROMPT | _get_llm()).invoke({"question": state["question"]})
     raw = result.content.strip()

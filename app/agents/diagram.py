@@ -1,3 +1,4 @@
+from observability import track
 """Diagram agent - generates Mermaid.js architecture diagrams with syntax validation."""
 
 import os
@@ -88,6 +89,7 @@ def _fix_mermaid_basic(code: str) -> str:
     return code
 
 
+@track("diagram")
 def diagram(state: AgentState) -> AgentState:
     result = (DIAGRAM_PROMPT | _get_llm()).invoke({
         "context": state["context"],

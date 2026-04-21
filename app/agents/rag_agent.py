@@ -1,3 +1,4 @@
+from observability import track
 """RAG agent node - generates answers using retrieved context."""
 
 import os
@@ -29,6 +30,7 @@ RAG_PROMPT = ChatPromptTemplate.from_template(
 )
 
 
+@track("rag_agent")
 def rag_generate(state: AgentState) -> AgentState:
     result = (RAG_PROMPT | _get_llm()).invoke({
         "context": state["context"],

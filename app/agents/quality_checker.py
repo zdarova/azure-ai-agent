@@ -1,3 +1,4 @@
+from observability import track
 """Quality Checker agent - evaluates response quality using LLM-as-judge."""
 
 import os
@@ -58,6 +59,7 @@ def _parse_scores(raw: str) -> dict:
     return None
 
 
+@track("quality_checker")
 def quality_check(state: AgentState) -> AgentState:
     result = (JUDGE_PROMPT | _get_llm()).invoke({
         "question": state["question"],
