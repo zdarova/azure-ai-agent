@@ -166,32 +166,106 @@ def metrics():
 def architecture():
     """Returns the live system architecture as a Mermaid diagram."""
     return {"diagram": """flowchart TD
-    User[Browser / SWA] -->|POST /api/chat| CA[Container Apps<br>FastAPI + LangGraph]
-    CA -->|1. Guardrails| GR[Input Validation]
-    GR -->|2. Route| Router[Router Agent<br>Claude Sonnet 4]
-    Router -->|3. Retrieve| PGV[(pgvector<br>PostgreSQL)]
-    PGV -->|4. Context| Specialist
-    subgraph Specialist[Specialist Agents]
-        RAG[RAG Agent]
+    User[Browser / Static Web App] -->|POST /api/chat SSE| CA[Container Apps - FastAPI + LangGraph]
+
+    subgraph Security[Security Layer]
+        GR[Guardrails - Anti-injection + PII Detection]
+    end
+
+    subgraph Orchestration[LangGraph Orchestration]
+        Router[Router Agent - Intent Classification + Reasoning]
+        LTM[Long-term Memory - Cosmos DB]
+    end
+
+    subgraph Specialists[11 Specialist Agents]
+        RAG[RAG Knowledge]
         SUM[Summarizer]
         INT[Interview Coach]
         ARCH[Architecture Advisor]
         CMP[Comparator]
         DIA[Diagram Generator]
+        LIN[Data Lineage]
         FB[Fallback]
     end
-    Specialist -->|5. Quality| QC[Quality Checker<br>LLM-as-Judge]
-    QC -->|6. Stream SSE| User
-    CA -->|Save| Cosmos[(Cosmos DB<br>Conversations)]
-    CA -->|Feedback| Cosmos
-    Blob[Azure Blob Storage] -->|Trigger| Func[Azure Function<br>Blob Ingest]
+
+    subgraph QualityLayer[Quality Assurance]
+        QC[Quality Checker - LLM-as-Judge]
+        FBK[Feedback Loop]
+        OBS[Observability - Tracing + Metrics]
+    end
+
+    subgraph DataLayer[Data Layer]
+        PGV[(pgvector - PostgreSQL)]
+        Cosmos[(Cosmos DB - Conversations + Memory)]
+    end
+
+    subgraph Ingestion[Data Ingestion]
+        Blob[Azure Blob Storage - Data Lake]
+        Func[Azure Function - Blob Trigger]
+        ADF[Azure Data Factory - ETL + Lineage]
+        CSV[CSV Pipeline - GitHub Actions]
+    end
+
+    subgraph MLOps[MLOps]
+        MLPipe[Azure ML Pipeline - RAG Evaluation]
+        MLW[ML Workspace - MLflow Tracking]
+        Gate[Quality Gate - Deploy Block/Allow]
+    end
+
+    subgraph CICD[CI/CD + IaC]
+        GHA[GitHub Actions - 4 Repos]
+        ACR[Azure Container Registry]
+        Bicep[Bicep IaC - 15+ Azure Resources]
+    end
+
+    subgraph AI[AI Services]
+        Claude[Claude Sonnet 4 - Azure AI Foundry]
+        OAI[Azure OpenAI - text-embedding-3-small]
+    end
+
+    User -->|Query| CA
+    CA --> GR
+    GR --> Router
+    Router -->|Inject memories| LTM
+    Router -->|Route| RAG
+    Router -->|Route| SUM
+    Router -->|Route| INT
+    Router -->|Route| ARCH
+    Router -->|Route| CMP
+    Router -->|Route| DIA
+    Router -->|Route| LIN
+    Router -->|Route| FB
+
+    RAG -->|Retrieve| PGV
+    SUM -->|Retrieve| PGV
+    INT -->|Retrieve| PGV
+    ARCH -->|Retrieve| PGV
+    CMP -->|Retrieve| PGV
+    DIA -->|Retrieve| PGV
+    LIN -->|Query lineage| PGV
+
+    Specialists --> QC
+    QC --> OBS
+    QC -->|SSE Stream| User
+    FBK -->|Save| Cosmos
+    CA -->|Save turns| Cosmos
+    LTM -->|Read/Write| Cosmos
+
+    Blob -->|Trigger| Func
     Func -->|Embed + Store| PGV
-    GHA[GitHub Actions] -->|CI/CD| ACR[Azure Container Registry]
+    ADF -->|Orchestrate| Blob
+    CSV -->|Ingest + Lineage| PGV
+
+    MLPipe -->|Evaluate| PGV
+    MLPipe --> MLW
+    MLPipe --> Gate
+
+    GHA -->|Build| ACR
     ACR -->|Deploy| CA
-    GHA -->|IaC| Bicep[Bicep Templates]
-    Bicep -->|Provision| Azure[Azure Resources]
-    MLPipe[Azure ML Pipeline] -->|Evaluate| PGV
-    MLPipe -->|MLflow Metrics| MLW[ML Workspace]"""}
+    GHA -->|Deploy| Bicep
+
+    Specialists -->|Call| Claude
+    RAG -->|Embed| OAI"""}
 
 
 @app.get("/api/health")
