@@ -51,7 +51,7 @@ def get_history(session_id: str, limit: int = 5) -> list:
     if container is None:
         return []
     try:
-        query = "SELECT c.question, c.response, c.route FROM c WHERE c.session_id = @sid ORDER BY c.timestamp DESC OFFSET 0 LIMIT @limit"
+        query = "SELECT c.question, c.response, c.route FROM c WHERE c.session_id = @sid AND NOT IS_DEFINED(c.type) ORDER BY c.timestamp DESC OFFSET 0 LIMIT @limit"
         items = list(container.query_items(
             query=query,
             parameters=[

@@ -68,8 +68,8 @@ def chat(req: ChatRequest):
             # Build initial state
             history = get_history(req.session_id)
             history_ctx = "\n".join(
-                f"User: {h['question']}\nAssistant: {h['response'][:200]}"
-                for h in history[-3:]
+                f"User: {h.get('question','')}\nAssistant: {h.get('response','')[:200]}"
+                for h in history[-3:] if h.get('question')
             ) if history else ""
 
             question = req.query if not history_ctx else f"[Conversazione precedente:\n{history_ctx}]\n\nNuova domanda: {req.query}"
