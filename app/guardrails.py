@@ -38,7 +38,7 @@ def check_input(query: str) -> dict:
             pii_found.append(pii_type)
 
     # Check excessive length (abuse)
-    if len(query) > 5000:
-        return {"safe": False, "reason": "Query troppo lunga (max 5000 caratteri).", "pii_detected": pii_found}
+    if len(query) > 20000:
+        return {"safe": False, "reason": "Query troppo lunga (max 20000 caratteri).", "pii_detected": pii_found}
 
     return {"safe": True, "reason": "", "pii_detected": pii_found}
