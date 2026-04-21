@@ -64,7 +64,9 @@
         .message { margin-bottom: 1.2rem; display: flex; gap: 0.6rem; max-width: 720px; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .message.user { flex-direction: row-reverse; margin-left: auto; }
+        .message.wide { max-width: 100%; }
         .message .bubble { max-width: 85%; padding: 0.9rem 1.1rem; border-radius: 12px; line-height: 1.65; font-size: 0.9rem; }
+        .message.wide .bubble { max-width: 100%; width: 100%; }
         .message.user .bubble { background: var(--ricoh-red); color: white; border-bottom-right-radius: 4px; }
         .message.assistant .bubble { background: var(--card); border: 1px solid var(--border); border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
         .message .avatar {
@@ -139,8 +141,8 @@
         .bubble th { background: var(--bg); font-weight: 600; }
         .bubble hr { border: none; border-top: 1px solid var(--border); margin: 0.6rem 0; }
         .bubble blockquote { border-left: 3px solid var(--ricoh-red); padding-left: 0.8rem; margin: 0.4rem 0; color: var(--text-muted); }
-        .bubble .mermaid { background: #f8fafb; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: 0.5rem 0; overflow-x: auto; }
-        .bubble .mermaid svg { max-width: 100%; height: auto; }
+        .bubble .mermaid { background: #f8fafb; border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin: 0.5rem 0; overflow-x: auto; text-align: center; }
+        .bubble .mermaid svg { max-width: 100%; height: auto; display: inline-block; }
 
         /* Responsive */
         @media (max-width: 768px) {
@@ -339,24 +341,32 @@
                                     bubble.innerHTML = badgeHtml + reasoningHtml + '<span class="typing">✍️ Generating response...</span>';
                                     document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
                                 }
-                    else if (eventType === 'response') {
+                                else if (eventType === 'response') {
                                     responseHtml = marked.parse(data.text);
-                                    bubble.innerHTML = badgeHtml + reasoningHtml + responseHtml + '<div class="typing" style="margin-top:0.5rem">🔍 Quality check in corso...</div>';
-                                    // Render any mermaid diagrams
-                                    bubble.querySelectorAll('code.language-mermaid').forEach(async (el) => {
+                                    const hasMermaid = data.text.includes('```mermaid');
+                                    if (hasMermaid) msg.classList.add('wide');
+                                    bubble.innerHTML = badgeHtml + reasoningHtml + responseHtml + '<div id="quality-placeholder" class="typing" style="margin-top:0.5rem">🔍 Quality check in corso...</div>';
+                                    // Render mermaid diagrams
+                                    bubble.querySelectorAll('code.language-mermaid').forEach((el) => {
                                         const pre = el.parentElement;
                                         const container = document.createElement('div');
                                         container.className = 'mermaid';
                                         container.textContent = el.textContent;
                                         pre.replaceWith(container);
                                     });
-                                    await mermaid.run({ nodes: bubble.querySelectorAll('.mermaid') });
+                                    try { await mermaid.run({ nodes: bubble.querySelectorAll('.mermaid') }); } catch(e) {}
                                     document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
                                 }
                                 else if (eventType === 'quality') {
                                     highlightAgent('quality_check');
-                                    const qualityHtml = data.quality ? renderQuality(data.quality) : '';
-                                    bubble.innerHTML = badgeHtml + reasoningHtml + responseHtml + qualityHtml;
+                                    // Remove the placeholder, append quality without destroying rendered content
+                                    const placeholder = bubble.querySelector('#quality-placeholder');
+                                    if (placeholder) placeholder.remove();
+                                    if (data.quality) {
+                                        const qDiv = document.createElement('div');
+                                        qDiv.innerHTML = renderQuality(data.quality);
+                                        bubble.appendChild(qDiv.firstElementChild);
+                                    }
                                     document.getElementById('chat').scrollTop = document.getElementById('chat').scrollHeight;
                                 }
                                 else if (eventType === 'error') {
