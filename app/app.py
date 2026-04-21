@@ -1,13 +1,20 @@
-"""Ricoh AI Knowledge Agent - FastAPI with SSE streaming."""
+"""Ricoh AI Knowledge Agent - FastAPI with progressive SSE streaming."""
 
 import uuid
 import json
-import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from agent import RicohAgent
+from agents.router import route as run_router
+from agents.retriever import retrieve as run_retriever
+from agents.rag_agent import rag_generate
+from agents.summarizer import summarize
+from agents.fallback import fallback
+from agents.interview_coach import interview_coach
+from agents.architect import architecture_advisor
+from agents.comparator import compare
+from agents.diagram import diagram
 from agents.quality_checker import quality_check
 from memory import save_turn, get_history
 import logging
@@ -15,7 +22,17 @@ import logging
 app = FastAPI(title="Ricoh AI Architect Selection")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-agent = RicohAgent()
+SPECIALISTS = {
+    "rag": rag_generate,
+    "summarize": summarize,
+    "interview": interview_coach,
+    "architecture": architecture_advisor,
+    "compare": compare,
+    "diagram": diagram,
+    "fallback": fallback,
+}
+
+RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "diagram"}
 
 
 class ChatRequest(BaseModel):
@@ -31,7 +48,7 @@ def _sse(event: str, data: dict) -> str:
 def chat(req: ChatRequest):
     def stream():
         try:
-            # Get conversation history
+            # Build initial state
             history = get_history(req.session_id)
             history_ctx = "\n".join(
                 f"User: {h['question']}\nAssistant: {h['response'][:200]}"
@@ -40,8 +57,7 @@ def chat(req: ChatRequest):
 
             question = req.query if not history_ctx else f"[Conversazione precedente:\n{history_ctx}]\n\nNuova domanda: {req.query}"
 
-            # Run the main graph (router → retrieve → specialist)
-            result = agent.graph.invoke({
+            state = {
                 "question": question,
                 "context": "",
                 "route": "rag",
@@ -49,38 +65,39 @@ def chat(req: ChatRequest):
                 "response": "",
                 "quality": None,
                 "session_id": req.session_id,
-            })
+            }
 
-            # Send routing + reasoning immediately
+            # Step 1: Router — send immediately
+            state = run_router(state)
             yield _sse("routing", {
-                "agent": result["route"],
-                "reasoning": result.get("reasoning", ""),
+                "agent": state["route"],
+                "reasoning": state.get("reasoning", ""),
             })
 
-            # Send the full response
-            yield _sse("response", {
-                "text": result["response"],
-            })
+            # Step 2: Retrieve (if needed)
+            if state["route"] in RETRIEVAL_ROUTES:
+                state = run_retriever(state)
 
-            # Run quality check (async, after response is already sent)
+            # Step 3: Specialist — send response
+            specialist = SPECIALISTS.get(state["route"], rag_generate)
+            state = specialist(state)
+            yield _sse("response", {"text": state["response"]})
+
+            # Step 4: Quality check — async after response
             try:
-                checked = quality_check(result)
-                quality = checked.get("quality")
+                state = quality_check(state)
+                yield _sse("quality", {"quality": state.get("quality")})
             except Exception:
-                quality = None
+                yield _sse("quality", {"quality": None})
 
-            yield _sse("quality", {
-                "quality": quality,
-            })
-
-            # Save to Cosmos DB
+            # Save to Cosmos
             save_turn(
                 session_id=req.session_id,
                 question=req.query,
-                route=result["route"],
-                reasoning=result.get("reasoning", ""),
-                response=result["response"],
-                quality=quality,
+                route=state["route"],
+                reasoning=state.get("reasoning", ""),
+                response=state["response"],
+                quality=state.get("quality"),
             )
 
             yield _sse("done", {"session_id": req.session_id})
@@ -92,7 +109,6 @@ def chat(req: ChatRequest):
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
-# Keep the old endpoint for backward compat / health
 @app.get("/api/health")
 def health():
     return {"status": "ok"}

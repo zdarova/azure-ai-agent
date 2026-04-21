@@ -21,6 +21,9 @@ class RicohAgent:
             "question": query,
             "context": "",
             "route": "rag",
+            "reasoning": "",
             "response": "",
+            "quality": None,
+            "session_id": "",
         })
         return result["response"]
