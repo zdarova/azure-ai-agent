@@ -189,12 +189,22 @@
         function renderQ(q) {
             const s=n=>'★'.repeat(Math.min(n,5))+'☆'.repeat(Math.max(5-n,0));
             const oc=q.overall>=4?`overall-${q.overall}`:q.overall>=3?'overall-3':'overall-1';
-            return `<div class="quality-bar"><div class="quality-header"><span>✅</span><span class="title">Quality Check · LLM-as-Judge</span></div>
-            <div class="quality-scores"><span class="overall-badge ${oc}">${q.overall}/5</span>
-            <span class="metric"><span class="metric-label">Rilevanza</span><span class="stars">${s(q.relevance)}</span></span>
-            <span class="metric"><span class="metric-label">Accuratezza</span><span class="stars">${s(q.accuracy)}</span></span>
-            <span class="metric"><span class="metric-label">Completezza</span><span class="stars">${s(q.completeness)}</span></span>
-            <span class="metric"><span class="metric-label">Chiarezza</span><span class="stars">${s(q.clarity)}</span></span></div>
+            return `<div class="quality-bar">
+            <div class="quality-header"><span>✅</span><span class="title">Quality Check · LLM-as-Judge · 9 Dimensions</span></div>
+            <div class="quality-scores">
+                <span class="overall-badge ${oc}">${q.overall}/5</span>
+                <span class="metric"><span class="metric-label">Rilevanza</span><span class="stars">${s(q.relevance)}</span></span>
+                <span class="metric"><span class="metric-label">Accuratezza</span><span class="stars">${s(q.accuracy)}</span></span>
+                <span class="metric"><span class="metric-label">Completezza</span><span class="stars">${s(q.completeness)}</span></span>
+                <span class="metric"><span class="metric-label">Chiarezza</span><span class="stars">${s(q.clarity)}</span></span>
+            </div>
+            <div class="quality-scores" style="margin-top:.3rem">
+                <span class="metric"><span class="metric-label">Hallucination</span><span class="stars">${s(q.hallucination)}</span></span>
+                <span class="metric"><span class="metric-label">Faithfulness</span><span class="stars">${s(q.faithfulness)}</span></span>
+                <span class="metric"><span class="metric-label">Ctx Precision</span><span class="stars">${s(q.context_precision)}</span></span>
+                <span class="metric"><span class="metric-label">Ctx Recall</span><span class="stars">${s(q.context_recall)}</span></span>
+                <span class="metric"><span class="metric-label">Toxicity/Bias</span><span class="stars">${s(q.toxicity_bias)}</span></span>
+            </div>
             ${q.note?`<div class="quality-note">"${q.note}"</div>`:''}</div>`;
         }
         async function showArchitecture() {
@@ -208,9 +218,17 @@
         async function showMetrics() {
             try {
                 const r=await fetch(BASE+'/api/metrics'), d=await r.json();
+                const s=n=>'★'.repeat(Math.round(n))+'☆'.repeat(5-Math.round(n));
                 let html='<span class="agent-badge">📊 metrics</span><h3>Agent Performance</h3><table><tr><th>Agent</th><th>Calls</th><th>Avg (ms)</th><th>Last (ms)</th><th>Errors</th></tr>';
                 for(const[k,v]of Object.entries(d.agents||{})) html+=`<tr><td>${k}</td><td>${v.calls}</td><td>${v.avg_ms}</td><td>${v.last_ms}</td><td>${v.errors}</td></tr>`;
                 html+='</table>';
+                if(d.quality && d.quality.total_evals){
+                    const q=d.quality;
+                    html+=`<br><h3>Quality Averages (${q.total_evals} evaluations)</h3><table><tr><th>Metric</th><th>Avg</th><th>Rating</th></tr>`;
+                    const labels={relevance:'Rilevanza',accuracy:'Accuratezza',completeness:'Completezza',clarity:'Chiarezza',hallucination:'Hallucination ↑',faithfulness:'Faithfulness',context_precision:'Context Precision',context_recall:'Context Recall',toxicity_bias:'Toxicity/Bias ↑',overall:'Overall'};
+                    for(const[k,label]of Object.entries(labels)){if(q[k])html+=`<tr><td>${label}</td><td>${q[k]}</td><td>${s(q[k])}</td></tr>`;}
+                    html+='</table>';
+                }
                 if(d.feedback) html+=`<br><strong>Feedback:</strong> 👍 ${d.feedback.thumbs_up} · 👎 ${d.feedback.thumbs_down}`;
                 addMsg('assistant', html);
             } catch(e){addMsg('assistant',`<em>Errore: ${e.message}</em>`);}

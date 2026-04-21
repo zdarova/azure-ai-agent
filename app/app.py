@@ -21,6 +21,7 @@ from memory import save_turn, get_history
 from guardrails import check_input
 from feedback import save_feedback, get_feedback_stats
 from observability import get_metrics
+from agents.quality_checker import get_quality_averages
 from longterm_memory import get_memories, extract_facts, save_memories
 import logging
 
@@ -159,7 +160,11 @@ def submit_feedback(req: FeedbackRequest):
 
 @app.get("/api/metrics")
 def metrics():
-    return {"agents": get_metrics(), "feedback": get_feedback_stats()}
+    return {
+        "agents": get_metrics(),
+        "feedback": get_feedback_stats(),
+        "quality": get_quality_averages(),
+    }
 
 
 @app.get("/api/architecture")
