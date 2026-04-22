@@ -1,6 +1,7 @@
-"""LangGraph multi-agent graph for Ricoh AI."""
+"""LangGraph multi-agent graph with Send fan-out for multi-route support."""
 
-from langgraph.graph import StateGraph, END
+from langgraph.graph import StateGraph, END, START
+from langgraph.types import Send
 from agents import AgentState
 from agents.router import route
 from agents.retriever import retrieve
@@ -13,57 +14,149 @@ from agents.comparator import compare
 from agents.diagram import diagram
 from agents.lineage_agent import lineage_query
 from agents.web_search import web_search
+from agents.quality_checker import quality_check
+from guardrails import check_input
+from memory import save_turn, get_history
+from longterm_memory import get_memories, extract_facts, save_memories
 
 RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "diagram", "web_search"}
 
+SPECIALISTS = {
+    "rag": rag_generate,
+    "summarize": summarize,
+    "interview": interview_coach,
+    "architecture": architecture_advisor,
+    "compare": compare,
+    "diagram": diagram,
+    "lineage": lineage_query,
+    "web_search": web_search,
+    "fallback": fallback,
+}
 
-def _pick_agent(state: AgentState) -> str:
-    route = state.get("route", "rag")
-    if route in RETRIEVAL_ROUTES:
+
+# --- Node functions ---
+
+def guardrails_node(state: AgentState) -> AgentState:
+    """Check input safety and PII, enrich question with history + memories."""
+    guard = check_input(state["question"])
+    if not guard["safe"]:
+        return {
+            "response": f"🛡️ {guard['reason']}",
+            "routes": ["__blocked__"],
+            "pii_detected": guard["pii_detected"],
+        }
+
+    # Enrich question with conversation history
+    history = get_history(state["session_id"])
+    history_ctx = "\n".join(
+        f"User: {h.get('question','')}\nAssistant: {h.get('response','')[:200]}"
+        for h in history[-3:] if h.get('question')
+    ) if history else ""
+
+    question = state["question"]
+    if history_ctx:
+        question = f"[Conversazione precedente:\n{history_ctx}]\n\nNuova domanda: {question}"
+
+    memories = get_memories(state["session_id"])
+    if memories:
+        question = f"[{memories}]\n\n{question}"
+
+    return {"question": question, "pii_detected": guard["pii_detected"]}
+
+
+def after_guardrails(state: AgentState) -> str:
+    """Route to router or END if blocked."""
+    if state.get("routes") == ["__blocked__"]:
+        return END
+    return "router"
+
+
+def after_router(state: AgentState) -> str:
+    """Decide whether retrieval is needed."""
+    routes = state.get("routes", ["rag"])
+    if any(r in RETRIEVAL_ROUTES for r in routes):
         return "retrieve"
-    if route == "lineage":
-        return "lineage"
-    return "fallback"
+    return "fan_out"
 
 
-def _post_retrieve(state: AgentState) -> str:
-    return state["route"]
+def fan_out_node(state: AgentState):
+    """Fan-out: send state to each specialist via Send API."""
+    routes = state.get("routes", ["rag"])
+    return [Send("specialist", {**state, "route": r, "agent_responses": []}) for r in routes]
 
+
+def specialist_node(state: AgentState) -> AgentState:
+    """Execute the specialist for the current route."""
+    agent_fn = SPECIALISTS.get(state["route"], rag_generate)
+    result = agent_fn(state)
+    return {
+        "agent_responses": [{
+            "agent": state["route"],
+            "text": result["response"],
+        }],
+    }
+
+
+def merge_node(state: AgentState) -> AgentState:
+    """Merge all specialist responses into a single response."""
+    parts = [ar["text"] for ar in state.get("agent_responses", [])]
+    return {"response": "\n\n---\n\n".join(parts)}
+
+
+def memory_node(state: AgentState) -> AgentState:
+    """Extract and save long-term memory facts."""
+    try:
+        routes = state.get("routes", ["rag"])
+        facts = extract_facts(state["question"], state["response"], ",".join(routes))
+        if facts:
+            save_memories(state["session_id"], facts)
+    except Exception:
+        pass
+    return {}
+
+
+def persist_node(state: AgentState) -> AgentState:
+    """Save conversation turn to Cosmos DB (skip if PII detected)."""
+    if not state.get("pii_detected"):
+        try:
+            routes = state.get("routes", ["rag"])
+            save_turn(
+                session_id=state["session_id"],
+                question=state["question"],
+                route=",".join(routes),
+                reasoning=state.get("reasoning", ""),
+                response=state["response"],
+                quality=state.get("quality"),
+            )
+        except Exception:
+            pass
+    return {}
+
+
+# --- Build graph ---
 
 def build_graph():
     g = StateGraph(AgentState)
 
+    g.add_node("guardrails", guardrails_node)
     g.add_node("router", route)
     g.add_node("retrieve", retrieve)
-    g.add_node("rag", rag_generate)
-    g.add_node("summarize", summarize)
-    g.add_node("fallback", fallback)
-    g.add_node("interview", interview_coach)
-    g.add_node("architecture", architecture_advisor)
-    g.add_node("compare", compare)
-    g.add_node("diagram", diagram)
-    g.add_node("lineage", lineage_query)
-    g.add_node("web_search", web_search)
+    g.add_node("fan_out", lambda state: {})  # passthrough, edges do the work
+    g.add_node("specialist", specialist_node)
+    g.add_node("merge", merge_node)
+    g.add_node("quality_check", quality_check)
+    g.add_node("memory", memory_node)
+    g.add_node("persist", persist_node)
 
-    g.set_entry_point("router")
-    g.add_conditional_edges("router", _pick_agent, {
-        "retrieve": "retrieve",
-        "lineage": "lineage",
-        "fallback": "fallback",
-    })
-
-    g.add_conditional_edges("retrieve", _post_retrieve, {
-        "rag": "rag",
-        "summarize": "summarize",
-        "interview": "interview",
-        "architecture": "architecture",
-        "compare": "compare",
-        "diagram": "diagram",
-        "web_search": "web_search",
-    })
-
-    # Specialists → END (quality check runs async outside the graph)
-    for node in ("rag", "summarize", "fallback", "interview", "architecture", "compare", "diagram", "lineage", "web_search"):
-        g.add_edge(node, END)
+    g.add_edge(START, "guardrails")
+    g.add_conditional_edges("guardrails", after_guardrails, {"router": "router", END: END})
+    g.add_conditional_edges("router", after_router, {"retrieve": "retrieve", "fan_out": "fan_out"})
+    g.add_edge("retrieve", "fan_out")
+    g.add_conditional_edges("fan_out", fan_out_node)
+    g.add_edge("specialist", "merge")
+    g.add_edge("merge", "quality_check")
+    g.add_edge("quality_check", "memory")
+    g.add_edge("memory", "persist")
+    g.add_edge("persist", END)
 
     return g.compile()

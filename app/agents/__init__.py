@@ -1,6 +1,7 @@
 """Shared state for the LangGraph multi-agent system."""
 
-from typing import Optional
+import operator
+from typing import Annotated, Optional
 from typing_extensions import TypedDict
 
 
@@ -8,8 +9,10 @@ class AgentState(TypedDict):
     question: str
     context: str
     routes: list[str]
-    route: str  # current active route (for backward compat)
+    route: str
     reasoning: str
+    agent_responses: Annotated[list[dict], operator.add]
     response: str
     quality: Optional[dict]
     session_id: str
+    pii_detected: list[str]

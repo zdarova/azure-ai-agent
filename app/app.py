@@ -1,4 +1,4 @@
-"""Ricoh AI Knowledge Agent - FastAPI with multi-route SSE streaming."""
+"""Ricoh AI Knowledge Agent - FastAPI + LangGraph with SSE streaming."""
 
 import uuid
 import json
@@ -6,42 +6,23 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from agents.router import route as run_router
-from agents.retriever import retrieve as run_retriever
-from agents.rag_agent import rag_generate
-from agents.summarizer import summarize
-from agents.fallback import fallback
-from agents.interview_coach import interview_coach
-from agents.architect import architecture_advisor
-from agents.comparator import compare
-from agents.diagram import diagram
-from agents.lineage_agent import lineage_query
-from agents.web_search import web_search
-from agents.quality_checker import quality_check, get_quality_averages
-from memory import save_turn, get_history
-from guardrails import check_input
+from graph import build_graph
+from agents.quality_checker import get_quality_averages
 from feedback import save_feedback, get_feedback_stats
 from observability import get_metrics
-from longterm_memory import get_memories, extract_facts, save_memories
 import logging
 
 app = FastAPI(title="Ricoh AI Architect Selection")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-SPECIALISTS = {
-    "rag": rag_generate,
-    "summarize": summarize,
-    "interview": interview_coach,
-    "architecture": architecture_advisor,
-    "compare": compare,
-    "diagram": diagram,
-    "lineage": lineage_query,
-    "web_search": web_search,
-    "fallback": fallback,
-}
+_graph = None
 
-RETRIEVAL_ROUTES = {"rag", "summarize", "interview", "architecture", "compare", "diagram", "web_search"}
-NO_RETRIEVE_ROUTES = {"lineage", "fallback"}
+
+def _get_graph():
+    global _graph
+    if _graph is None:
+        _graph = build_graph()
+    return _graph
 
 
 class ChatRequest(BaseModel):
@@ -62,109 +43,61 @@ def _sse(event: str, data: dict) -> str:
 @app.post("/api/chat")
 def chat(req: ChatRequest):
     def stream():
+        msg_id = str(uuid.uuid4())[:8]
+        initial_state = {
+            "question": req.query,
+            "context": "",
+            "routes": ["rag"],
+            "route": "rag",
+            "reasoning": "",
+            "agent_responses": [],
+            "response": "",
+            "quality": None,
+            "session_id": req.session_id,
+            "pii_detected": [],
+        }
+
         try:
-            # Guardrails
-            guard = check_input(req.query)
-            if not guard["safe"]:
-                yield _sse("error", {"message": f"🛡️ {guard['reason']}"})
-                return
-            if guard["pii_detected"]:
-                yield _sse("warning", {"message": f"⚠️ PII rilevato: {', '.join(guard['pii_detected'])}. Procedo senza memorizzare."})
+            for event in _get_graph().stream(initial_state):
+                for node_name, node_output in event.items():
 
-            # Build state
-            history = get_history(req.session_id)
-            history_ctx = "\n".join(
-                f"User: {h.get('question','')}\nAssistant: {h.get('response','')[:200]}"
-                for h in history[-3:] if h.get('question')
-            ) if history else ""
+                    if node_name == "guardrails":
+                        # Blocked by guardrails
+                        if node_output.get("routes") == ["__blocked__"]:
+                            yield _sse("error", {"message": node_output.get("response", "Blocked")})
+                            return
+                        # PII warning
+                        pii = node_output.get("pii_detected", [])
+                        if pii:
+                            yield _sse("warning", {"message": f"⚠️ PII rilevato: {', '.join(pii)}. Procedo senza memorizzare."})
 
-            question = req.query if not history_ctx else f"[Conversazione precedente:\n{history_ctx}]\n\nNuova domanda: {req.query}"
+                    elif node_name == "router":
+                        routes = node_output.get("routes", ["rag"])
+                        yield _sse("routing", {
+                            "agents": routes,
+                            "agent": routes[0],
+                            "reasoning": node_output.get("reasoning", ""),
+                            "message_id": msg_id,
+                            "multi": len(routes) > 1,
+                        })
 
-            memories = get_memories(req.session_id)
-            if memories:
-                question = f"[{memories}]\n\n{question}"
+                    elif node_name == "specialist":
+                        for ar in node_output.get("agent_responses", []):
+                            yield _sse("agent_response", {
+                                "agent": ar["agent"],
+                                "text": ar["text"],
+                            })
 
-            msg_id = str(uuid.uuid4())[:8]
+                    elif node_name == "merge":
+                        yield _sse("response", {"text": node_output.get("response", "")})
 
-            state = {
-                "question": question,
-                "context": "",
-                "routes": ["rag"],
-                "route": "rag",
-                "reasoning": "",
-                "response": "",
-                "quality": None,
-                "session_id": req.session_id,
-            }
+                    elif node_name == "quality_check":
+                        yield _sse("quality", {"quality": node_output.get("quality")})
+                        yield _sse("trace", {"metrics": get_metrics()})
 
-            # Step 1: Router (multi-route)
-            state = run_router(state)
-            routes = state.get("routes", [state.get("route", "rag")])
-            yield _sse("routing", {
-                "agents": routes,
-                "agent": routes[0],
-                "reasoning": state.get("reasoning", ""),
-                "message_id": msg_id,
-                "multi": len(routes) > 1,
-            })
-
-            # Step 2: Retrieve once (shared across agents that need it)
-            needs_retrieval = any(r in RETRIEVAL_ROUTES for r in routes)
-            if needs_retrieval:
-                state = run_retriever(state)
-
-            # Step 3: Execute each specialist and stream progressively
-            all_responses = []
-            for i, agent_route in enumerate(routes):
-                state["route"] = agent_route
-                specialist = SPECIALISTS.get(agent_route, rag_generate)
-                agent_state = specialist(state)
-
-                agent_response = agent_state["response"]
-                all_responses.append(agent_response)
-
-                # Send each agent's response as it completes
-                yield _sse("agent_response", {
-                    "agent": agent_route,
-                    "text": agent_response,
-                    "index": i,
-                    "total": len(routes),
-                })
-
-            # Merge all responses
-            merged = "\n\n---\n\n".join(all_responses)
-            state["response"] = merged
-            yield _sse("response", {"text": merged})
-
-            # Step 4: Quality check
-            try:
-                state = quality_check(state)
-                yield _sse("quality", {"quality": state.get("quality")})
-            except Exception:
-                yield _sse("quality", {"quality": None})
-
-            # Step 5: Trace
-            yield _sse("trace", {"metrics": get_metrics()})
-
-            # Step 6: Long-term memory
-            try:
-                facts = extract_facts(req.query, state["response"], ",".join(routes))
-                if facts:
-                    save_memories(req.session_id, facts)
-                    yield _sse("memory", {"new_facts": len(facts)})
-            except Exception:
-                pass
-
-            # Save to Cosmos
-            if not guard["pii_detected"]:
-                save_turn(
-                    session_id=req.session_id,
-                    question=req.query,
-                    route=",".join(routes),
-                    reasoning=state.get("reasoning", ""),
-                    response=state["response"],
-                    quality=state.get("quality"),
-                )
+                    elif node_name == "memory":
+                        # Memory node returns {} but we can check state
+                        pass
 
             yield _sse("done", {"session_id": req.session_id, "message_id": msg_id})
 
