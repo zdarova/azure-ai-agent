@@ -26,8 +26,12 @@ function esc(t) {
     return d.innerHTML;
 }
 
-function scrollBottom() {
-    chatEl.scrollTop = chatEl.scrollHeight;
+function isNearBottom() {
+    return chatEl.scrollHeight - chatEl.scrollTop - chatEl.clientHeight < 80;
+}
+
+function scrollBottom(force = false) {
+    if (force || isNearBottom()) chatEl.scrollTop = chatEl.scrollHeight;
 }
 
 function addMsg(role, html) {
@@ -164,6 +168,7 @@ async function send() {
     inputEl.value = '';
     btnEl.disabled = true;
     hl(null);
+    scrollBottom(true);
 
     const msg = addMsg('assistant', '<span class="typing">⏳ Guardrails check...</span>');
     const bub = msg.querySelector('.bubble');
@@ -291,7 +296,6 @@ async function send() {
                             fb.className = 'feedback-row';
                             fb.innerHTML = `<span class="feedback-label">Utile?</span><button class="fb-btn" onclick="sendFb('${mid}','thumbs_up',this)">👍</button><button class="fb-btn" onclick="sendFb('${mid}','thumbs_down',this)">👎</button>`;
                             bub.appendChild(fb);
-                            scrollBottom();
                         }
                         else if (ev === 'error') {
                             bub.innerHTML = `<em>🛡️ ${esc(d.message)}</em>`;
