@@ -45,7 +45,9 @@ function stopVoice() {
 
 let _ttsAudio = null;
 
-async function playTTS(text, btn) {
+async function playTTS(btn) {
+    const text = btn.dataset.ttsText;
+    if (!text) return;
     if (_ttsAudio && !_ttsAudio.paused) { _ttsAudio.pause(); _ttsAudio = null; btn.classList.remove('playing'); btn.textContent = '🔊'; return; }
     btn.classList.add('playing'); btn.textContent = '⏳';
     try {
@@ -83,7 +85,10 @@ async function exportPPTX() {
     } catch(e) { alert('Errore: ' + e.message); }
 }
 
-async function exportSlidePPTX(title, text) {
+async function exportSlidePPTX(btn) {
+    const title = btn.dataset.pptxTitle || 'AI';
+    const text = btn.dataset.pptxText || '';
+    if (!text) return;
     try {
         const res = await fetch(BASE + '/api/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slides: [{ title, content: text.substring(0, 4000) }] }) });
         if (!res.ok) { alert('Errore generazione PPTX'); return; }
@@ -380,13 +385,38 @@ async function send() {
                             const cleanClone = bub.cloneNode(true);
                             cleanClone.querySelectorAll('.quality-bar, .trace-bar, .feedback-row, .diagram-controls, .agent-badge, .reasoning-box, .warning-box').forEach(e => e.remove());
                             const cleanText = cleanClone.innerText.trim();
-                            const agentLabel = routes.map(r => r).join(' + ');
+                            const agentLabel = routes.join(' + ');
 
                             const actions = document.createElement('div');
                             actions.className = 'feedback-row';
-                            actions.innerHTML = `<span class="feedback-label">Utile?</span><button class="fb-btn" onclick="sendFb('${mid}','thumbs_up',this)">👍</button><button class="fb-btn" onclick="sendFb('${mid}','thumbs_down',this)">👎</button>`
-                                + `<button class="tts-btn" onclick="playTTS(decodeURIComponent('${encodeURIComponent(cleanText.substring(0,3000))}'),this)" title="Ascolta (TTS)">🔊</button>`
-                                + `<button class="pptx-btn" onclick="exportSlidePPTX('${agentLabel.replace(/'/g,'')}',decodeURIComponent('${encodeURIComponent(cleanText.substring(0,4000))}'))" title="Esporta slide">📑</button>`;
+
+                            const fbUp = document.createElement('button');
+                            fbUp.className = 'fb-btn'; fbUp.textContent = '👍';
+                            fbUp.onclick = function() { sendFb(mid, 'thumbs_up', this); };
+
+                            const fbDown = document.createElement('button');
+                            fbDown.className = 'fb-btn'; fbDown.textContent = '👎';
+                            fbDown.onclick = function() { sendFb(mid, 'thumbs_down', this); };
+
+                            const ttsBtn = document.createElement('button');
+                            ttsBtn.className = 'tts-btn'; ttsBtn.textContent = '🔊'; ttsBtn.title = 'Ascolta (TTS)';
+                            ttsBtn.dataset.ttsText = cleanText.substring(0, 3000);
+                            ttsBtn.onclick = function() { playTTS(this); };
+
+                            const pptxBtn = document.createElement('button');
+                            pptxBtn.className = 'pptx-btn'; pptxBtn.textContent = '📑'; pptxBtn.title = 'Esporta slide';
+                            pptxBtn.dataset.pptxTitle = agentLabel;
+                            pptxBtn.dataset.pptxText = cleanText.substring(0, 4000);
+                            pptxBtn.onclick = function() { exportSlidePPTX(this); };
+
+                            const label = document.createElement('span');
+                            label.className = 'feedback-label'; label.textContent = 'Utile?';
+
+                            actions.appendChild(label);
+                            actions.appendChild(fbUp);
+                            actions.appendChild(fbDown);
+                            actions.appendChild(ttsBtn);
+                            actions.appendChild(pptxBtn);
                             bub.appendChild(actions);
                         }
                         else if (ev === 'error') {
