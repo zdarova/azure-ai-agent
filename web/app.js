@@ -28,7 +28,7 @@ function toggleVoice() {
         for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
         inputEl.value = transcript;
     };
-    _recognition.onend = () => { stopVoice(); };
+    _recognition.onend = () => { stopVoice(); if (inputEl.value.trim()) send(); };
     _recognition.onerror = (e) => { console.warn('STT error:', e.error); stopVoice(); };
     _recognition.start();
 }
