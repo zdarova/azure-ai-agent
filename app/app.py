@@ -2,14 +2,16 @@
 
 import uuid
 import json
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field
 from graph import build_graph
 from agents.quality_checker import get_quality_averages
 from feedback import save_feedback, get_feedback_stats
 from observability import get_metrics
+from speech import synthesize_speech
+from pptx_gen import generate_pptx
 import logging
 
 app = FastAPI(title="Ricoh AI Architect Selection")
@@ -34,6 +36,19 @@ class FeedbackRequest(BaseModel):
     session_id: str
     message_id: str
     rating: str
+
+
+class TTSRequest(BaseModel):
+    text: str
+
+
+class SlideItem(BaseModel):
+    title: str
+    content: str
+
+
+class PPTXRequest(BaseModel):
+    slides: list[SlideItem]
 
 
 def _sse(event: str, data: dict) -> str:
@@ -121,6 +136,26 @@ def metrics():
         "feedback": get_feedback_stats(),
         "quality": get_quality_averages(),
     }
+
+
+@app.post("/api/tts")
+def tts(req: TTSRequest):
+    audio = synthesize_speech(req.text)
+    if audio is None:
+        return Response(status_code=503, content="TTS not available")
+    return Response(content=audio, media_type="audio/mpeg",
+                    headers={"Content-Disposition": "inline; filename=speech.mp3"})
+
+
+@app.post("/api/pptx")
+def create_pptx(req: PPTXRequest):
+    data = [s.model_dump() for s in req.slides]
+    pptx_bytes = generate_pptx(data)
+    return Response(
+        content=pptx_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": "attachment; filename=ricoh-ai-presentation.pptx"},
+    )
 
 
 @app.get("/api/architecture")

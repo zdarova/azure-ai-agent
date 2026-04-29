@@ -7,6 +7,90 @@ localStorage.setItem('ricoh_session', SID);
 const chatEl = document.getElementById('chat');
 const inputEl = document.getElementById('input');
 const btnEl = document.getElementById('btn');
+const voiceBtnEl = document.getElementById('voiceBtn');
+
+// --- Voice (STT via Web Speech API) ---
+
+let _recognition = null;
+let _isRecording = false;
+
+function toggleVoice() {
+    if (_isRecording) { stopVoice(); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { alert('Speech Recognition non supportato in questo browser. Usa Chrome.'); return; }
+    _recognition = new SR();
+    _recognition.lang = 'it-IT';
+    _recognition.continuous = false;
+    _recognition.interimResults = true;
+    _recognition.onstart = () => { _isRecording = true; voiceBtnEl.classList.add('recording'); voiceBtnEl.textContent = '⏹️'; inputEl.placeholder = '🎤 Sto ascoltando...'; };
+    _recognition.onresult = (e) => {
+        let transcript = '';
+        for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+        inputEl.value = transcript;
+    };
+    _recognition.onend = () => { stopVoice(); };
+    _recognition.onerror = (e) => { console.warn('STT error:', e.error); stopVoice(); };
+    _recognition.start();
+}
+
+function stopVoice() {
+    _isRecording = false;
+    voiceBtnEl.classList.remove('recording');
+    voiceBtnEl.textContent = '🎤';
+    inputEl.placeholder = 'Chiedi qualcosa su Ricoh Italia...';
+    if (_recognition) { try { _recognition.stop(); } catch(e) {} _recognition = null; }
+}
+
+// --- TTS (Azure Speech via backend) ---
+
+let _ttsAudio = null;
+
+async function playTTS(text, btn) {
+    if (_ttsAudio && !_ttsAudio.paused) { _ttsAudio.pause(); _ttsAudio = null; btn.classList.remove('playing'); btn.textContent = '🔊'; return; }
+    btn.classList.add('playing'); btn.textContent = '⏳';
+    try {
+        const res = await fetch(BASE + '/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+        if (!res.ok) { btn.textContent = '❌'; setTimeout(() => { btn.textContent = '🔊'; btn.classList.remove('playing'); }, 2000); return; }
+        const blob = await res.blob();
+        _ttsAudio = new Audio(URL.createObjectURL(blob));
+        _ttsAudio.onended = () => { btn.classList.remove('playing'); btn.textContent = '🔊'; _ttsAudio = null; };
+        btn.textContent = '⏹️';
+        _ttsAudio.play();
+    } catch(e) { btn.textContent = '🔊'; btn.classList.remove('playing'); }
+}
+
+// --- PPTX Export ---
+
+async function exportPPTX() {
+    const messages = document.querySelectorAll('.message.assistant .bubble');
+    if (!messages.length) { alert('Nessuna risposta da esportare.'); return; }
+    const slides = [];
+    messages.forEach((bub, i) => {
+        const badges = bub.querySelectorAll('.agent-badge');
+        const agent = badges.length ? Array.from(badges).map(b => b.textContent.replace('🤖 ','')).join(' + ') : 'AI';
+        // Get text content, skip quality/trace/feedback elements
+        const clone = bub.cloneNode(true);
+        clone.querySelectorAll('.quality-bar, .trace-bar, .feedback-row, .diagram-controls, .tts-btn, .pptx-btn').forEach(e => e.remove());
+        const text = clone.innerText.trim();
+        if (text.length > 20) slides.push({ title: `${agent}`, content: text.substring(0, 4000) });
+    });
+    if (!slides.length) { alert('Nessun contenuto da esportare.'); return; }
+    try {
+        const res = await fetch(BASE + '/api/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slides }) });
+        if (!res.ok) { alert('Errore generazione PPTX'); return; }
+        const blob = await res.blob();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ricoh-ai-presentation.pptx'; a.click();
+    } catch(e) { alert('Errore: ' + e.message); }
+}
+
+async function exportSlidePPTX(title, text) {
+    try {
+        const res = await fetch(BASE + '/api/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slides: [{ title, content: text.substring(0, 4000) }] }) });
+        if (!res.ok) { alert('Errore generazione PPTX'); return; }
+        const blob = await res.blob();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ricoh-ai-slide.pptx'; a.click();
+    } catch(e) { alert('Errore: ' + e.message); }
+}
 
 // --- Utilities ---
 
@@ -292,10 +376,18 @@ async function send() {
                         }
                         else if (ev === 'done') {
                             hl(null);
-                            const fb = document.createElement('div');
-                            fb.className = 'feedback-row';
-                            fb.innerHTML = `<span class="feedback-label">Utile?</span><button class="fb-btn" onclick="sendFb('${mid}','thumbs_up',this)">👍</button><button class="fb-btn" onclick="sendFb('${mid}','thumbs_down',this)">👎</button>`;
-                            bub.appendChild(fb);
+                            // Get clean text for TTS/PPTX
+                            const cleanClone = bub.cloneNode(true);
+                            cleanClone.querySelectorAll('.quality-bar, .trace-bar, .feedback-row, .diagram-controls, .agent-badge, .reasoning-box, .warning-box').forEach(e => e.remove());
+                            const cleanText = cleanClone.innerText.trim();
+                            const agentLabel = routes.map(r => r).join(' + ');
+
+                            const actions = document.createElement('div');
+                            actions.className = 'feedback-row';
+                            actions.innerHTML = `<span class="feedback-label">Utile?</span><button class="fb-btn" onclick="sendFb('${mid}','thumbs_up',this)">👍</button><button class="fb-btn" onclick="sendFb('${mid}','thumbs_down',this)">👎</button>`
+                                + `<button class="tts-btn" onclick="playTTS(decodeURIComponent('${encodeURIComponent(cleanText.substring(0,3000))}'),this)" title="Ascolta (TTS)">🔊</button>`
+                                + `<button class="pptx-btn" onclick="exportSlidePPTX('${agentLabel.replace(/'/g,'')}',decodeURIComponent('${encodeURIComponent(cleanText.substring(0,4000))}'))" title="Esporta slide">📑</button>`;
+                            bub.appendChild(actions);
                         }
                         else if (ev === 'error') {
                             bub.innerHTML = `<em>🛡️ ${esc(d.message)}</em>`;
