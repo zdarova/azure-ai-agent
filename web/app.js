@@ -41,42 +41,57 @@ function stopVoice() {
     if (_recognition) { try { _recognition.stop(); } catch(e) {} _recognition = null; }
 }
 
-// --- TTS (Azure Speech via backend) ---
+// --- TTS (Browser Speech Synthesis + Azure fallback) ---
 
+let _ttsUtterance = null;
 let _ttsAudio = null;
+
+function _stopTTS(btn) {
+    if (_ttsUtterance) { speechSynthesis.cancel(); _ttsUtterance = null; }
+    if (_ttsAudio) { _ttsAudio.pause(); _ttsAudio = null; }
+    if (btn) { btn.classList.remove('playing'); btn.textContent = '🔊'; }
+}
 
 async function playTTS(btn) {
     const text = btn.dataset.ttsText;
     if (!text) return;
-    if (_ttsAudio && !_ttsAudio.paused) { _ttsAudio.pause(); _ttsAudio = null; btn.classList.remove('playing'); btn.textContent = '🔊'; return; }
-    btn.classList.add('playing'); btn.textContent = '⏳';
+    // Toggle off
+    if (btn.classList.contains('playing')) { _stopTTS(btn); return; }
+    btn.classList.add('playing'); btn.textContent = '⏹️';
+
+    // Try Azure TTS first
     try {
         const res = await fetch(BASE + '/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
-        if (!res.ok) { btn.textContent = '❌'; setTimeout(() => { btn.textContent = '🔊'; btn.classList.remove('playing'); }, 2000); return; }
-        const blob = await res.blob();
-        _ttsAudio = new Audio(URL.createObjectURL(blob));
-        _ttsAudio.onended = () => { btn.classList.remove('playing'); btn.textContent = '🔊'; _ttsAudio = null; };
-        btn.textContent = '⏹️';
-        _ttsAudio.play();
-    } catch(e) { btn.textContent = '🔊'; btn.classList.remove('playing'); }
+        if (res.ok) {
+            const blob = await res.blob();
+            _ttsAudio = new Audio(URL.createObjectURL(blob));
+            _ttsAudio.onended = () => _stopTTS(btn);
+            _ttsAudio.onerror = () => _stopTTS(btn);
+            _ttsAudio.play();
+            return;
+        }
+    } catch(e) {}
+
+    // Fallback: browser Web Speech API
+    if ('speechSynthesis' in window) {
+        const clean = text.replace(/[#*`|]/g, '').replace(/---/g, '').substring(0, 3000);
+        _ttsUtterance = new SpeechSynthesisUtterance(clean);
+        _ttsUtterance.lang = 'it-IT';
+        _ttsUtterance.rate = 1.05;
+        _ttsUtterance.onend = () => _stopTTS(btn);
+        _ttsUtterance.onerror = () => _stopTTS(btn);
+        speechSynthesis.speak(_ttsUtterance);
+    } else {
+        btn.textContent = '❌'; setTimeout(() => _stopTTS(btn), 2000);
+    }
 }
 
 // --- PPTX Export ---
 
-async function exportPPTX() {
-    const messages = document.querySelectorAll('.message.assistant .bubble');
-    if (!messages.length) { alert('Nessuna risposta da esportare.'); return; }
-    const slides = [];
-    messages.forEach((bub, i) => {
-        const badges = bub.querySelectorAll('.agent-badge');
-        const agent = badges.length ? Array.from(badges).map(b => b.textContent.replace('🤖 ','')).join(' + ') : 'AI';
-        // Get text content, skip quality/trace/feedback elements
-        const clone = bub.cloneNode(true);
-        clone.querySelectorAll('.quality-bar, .trace-bar, .feedback-row, .diagram-controls, .tts-btn, .pptx-btn').forEach(e => e.remove());
-        const text = (clone.textContent || '').replace(/\s+/g, ' ').trim();
-        if (text.length > 20) slides.push({ title: `${agent}`, content: text.substring(0, 4000) });
-    });
-    if (!slides.length) { alert('Nessun contenuto da esportare.'); return; }
+// Store raw markdown per message for PPTX (keyed by msg_id)
+const _rawMarkdown = {};
+
+async function _downloadPPTX(slides) {
     try {
         const res = await fetch(BASE + '/api/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slides }) });
         if (!res.ok) { alert('Errore generazione PPTX'); return; }
@@ -85,16 +100,20 @@ async function exportPPTX() {
     } catch(e) { alert('Errore: ' + e.message); }
 }
 
+async function exportPPTX() {
+    const slides = [];
+    for (const [id, data] of Object.entries(_rawMarkdown)) {
+        if (data.markdown.length > 20) slides.push({ title: data.title, content: data.markdown.substring(0, 8000) });
+    }
+    if (!slides.length) { alert('Nessuna risposta da esportare.'); return; }
+    await _downloadPPTX(slides);
+}
+
 async function exportSlidePPTX(btn) {
-    const title = btn.dataset.pptxTitle || 'AI';
-    const text = btn.dataset.pptxText || '';
-    if (!text) { alert('Nessun testo da esportare (dataset vuoto).'); return; }
-    try {
-        const res = await fetch(BASE + '/api/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slides: [{ title, content: text.substring(0, 4000) }] }) });
-        if (!res.ok) { alert('Errore generazione PPTX'); return; }
-        const blob = await res.blob();
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ricoh-ai-slide.pptx'; a.click();
-    } catch(e) { alert('Errore: ' + e.message); }
+    const mid = btn.dataset.pptxMid || '';
+    const data = _rawMarkdown[mid];
+    if (!data || !data.markdown) { alert('Nessun contenuto da esportare.'); return; }
+    await _downloadPPTX([{ title: data.title, content: data.markdown.substring(0, 8000) }]);
 }
 
 // --- Utilities ---
@@ -274,6 +293,7 @@ async function send() {
         let reasonHtml = '';
         let warningHtml = '';
         let agentResponses = {};
+        let mergedResponseText = '';
 
         while (true) {
             const { done, value } = await reader.read();
@@ -337,6 +357,7 @@ async function send() {
                             scrollBottom();
                         }
                         else if (ev === 'response') {
+                            mergedResponseText = d.text || '';
                             // Final merged response — only used if no agent_response events arrived (backward compat)
                             if (Object.keys(agentResponses).length === 0) {
                                 const badges = routes.map(r => `<span class="agent-badge">🤖 ${r}</span>`).join(' ');
@@ -381,11 +402,16 @@ async function send() {
                         }
                         else if (ev === 'done') {
                             hl(null);
-                            // Get clean text for TTS/PPTX — use textContent (layout-independent)
-                            const cleanClone = bub.cloneNode(true);
-                            cleanClone.querySelectorAll('.quality-bar, .trace-bar, .feedback-row, .diagram-controls, .agent-badge, .reasoning-box, .warning-box, .typing').forEach(e => e.remove());
-                            const cleanText = (cleanClone.textContent || '').replace(/\s+/g, ' ').trim();
                             const agentLabel = routes.join(' + ');
+
+                            // Store raw markdown for PPTX — prefer agentResponses, fallback to merged response
+                            const rawMd = Object.keys(agentResponses).length > 0
+                                ? Object.values(agentResponses).join('\n\n---\n\n')
+                                : mergedResponseText;
+                            _rawMarkdown[mid] = { title: agentLabel, markdown: rawMd };
+
+                            // Clean text for TTS (strip markdown syntax)
+                            const ttsText = rawMd.replace(/```[\s\S]*?```/g, '').replace(/[#*`|]/g, '').replace(/---/g, ' ').replace(/\s+/g, ' ').trim();
 
                             const actions = document.createElement('div');
                             actions.className = 'feedback-row';
@@ -400,13 +426,12 @@ async function send() {
 
                             const ttsBtn = document.createElement('button');
                             ttsBtn.className = 'tts-btn'; ttsBtn.textContent = '🔊'; ttsBtn.title = 'Ascolta (TTS)';
-                            ttsBtn.dataset.ttsText = cleanText.substring(0, 3000);
+                            ttsBtn.dataset.ttsText = ttsText.substring(0, 3000);
                             ttsBtn.onclick = function() { playTTS(this); };
 
                             const pptxBtn = document.createElement('button');
                             pptxBtn.className = 'pptx-btn'; pptxBtn.textContent = '📑'; pptxBtn.title = 'Esporta slide';
-                            pptxBtn.dataset.pptxTitle = agentLabel;
-                            pptxBtn.dataset.pptxText = cleanText.substring(0, 4000);
+                            pptxBtn.dataset.pptxMid = mid;
                             pptxBtn.onclick = function() { exportSlidePPTX(this); };
 
                             const label = document.createElement('span');
