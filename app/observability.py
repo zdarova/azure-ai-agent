@@ -1,12 +1,14 @@
-"""Observability - tracks agent latency with Cosmos DB persistence."""
+"""Observability - tracks agent latency with async Cosmos DB persistence."""
 
 import time
 import logging
+import threading
 from collections import defaultdict
 from functools import wraps
 
 _metrics = defaultdict(lambda: {"calls": 0, "total_ms": 0, "errors": 0, "last_ms": 0})
 _loaded = False
+_lock = threading.Lock()
 _COSMOS_DOC_ID = "agent-metrics-global"
 
 
@@ -33,24 +35,28 @@ def _load_from_cosmos():
             _metrics[name]["total_ms"] = m.get("total_ms", 0)
             _metrics[name]["errors"] = m.get("errors", 0)
             _metrics[name]["last_ms"] = m.get("last_ms", 0)
-        logging.info(f"Loaded metrics from Cosmos DB ({len(_metrics)} agents)")
     except Exception:
         pass
 
 
-def _save_to_cosmos():
-    container = _get_container()
-    if container is None:
-        return
-    try:
-        container.upsert_item({
-            "id": _COSMOS_DOC_ID,
-            "session_id": "__metrics__",
-            "type": "metrics",
-            "agents": {name: dict(m) for name, m in _metrics.items()},
-        })
-    except Exception as e:
-        logging.warning(f"Failed to save metrics: {e}")
+def _save_to_cosmos_async():
+    """Save metrics in a background thread to avoid blocking the pipeline."""
+    def _save():
+        container = _get_container()
+        if container is None:
+            return
+        try:
+            with _lock:
+                snapshot = {name: dict(m) for name, m in _metrics.items()}
+            container.upsert_item({
+                "id": _COSMOS_DOC_ID,
+                "session_id": "__metrics__",
+                "type": "metrics",
+                "agents": snapshot,
+            })
+        except Exception as e:
+            logging.warning(f"Failed to save metrics: {e}")
+    threading.Thread(target=_save, daemon=True).start()
 
 
 def track(agent_name: str):
@@ -63,15 +69,17 @@ def track(agent_name: str):
             try:
                 result = fn(state)
                 elapsed = (time.perf_counter() - start) * 1000
-                _metrics[agent_name]["calls"] += 1
-                _metrics[agent_name]["total_ms"] += elapsed
-                _metrics[agent_name]["last_ms"] = round(elapsed)
+                with _lock:
+                    _metrics[agent_name]["calls"] += 1
+                    _metrics[agent_name]["total_ms"] += elapsed
+                    _metrics[agent_name]["last_ms"] = round(elapsed)
                 logging.info(f"[{agent_name}] {elapsed:.0f}ms")
-                _save_to_cosmos()
+                _save_to_cosmos_async()
                 return result
             except Exception as e:
-                _metrics[agent_name]["errors"] += 1
-                _save_to_cosmos()
+                with _lock:
+                    _metrics[agent_name]["errors"] += 1
+                _save_to_cosmos_async()
                 raise
         return wrapper
     return decorator
@@ -80,14 +88,15 @@ def track(agent_name: str):
 def get_metrics() -> dict:
     _load_from_cosmos()
     result = {}
-    for name, m in _metrics.items():
-        avg = round(m["total_ms"] / m["calls"]) if m["calls"] > 0 else 0
-        result[name] = {
-            "calls": m["calls"],
-            "avg_ms": avg,
-            "last_ms": m["last_ms"],
-            "errors": m["errors"],
-        }
+    with _lock:
+        for name, m in _metrics.items():
+            avg = round(m["total_ms"] / m["calls"]) if m["calls"] > 0 else 0
+            result[name] = {
+                "calls": m["calls"],
+                "avg_ms": avg,
+                "last_ms": m["last_ms"],
+                "errors": m["errors"],
+            }
     return result
 
 

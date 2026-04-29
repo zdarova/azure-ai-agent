@@ -18,7 +18,7 @@ def _get_llm():
             model=os.environ["AZURE_AI_CHAT_DEPLOYMENT"],
             api_key=os.environ["AZURE_AI_KEY"],
             base_url=os.environ["AZURE_AI_ENDPOINT"],
-            temperature=0, max_tokens=512,
+            temperature=0, max_tokens=300,
         )
     return _llm
 
@@ -120,9 +120,9 @@ def get_quality_averages() -> dict:
 @track("quality_checker")
 def quality_check(state: AgentState) -> AgentState:
     result = (JUDGE_PROMPT | _get_llm()).invoke({
-        "question": state["question"][:500],
-        "context": state["context"][:500],
-        "response": state["response"][:1500],
+        "question": state["question"][:300],
+        "context": state["context"][:300],
+        "response": state["response"][:800],
     })
 
     scores = _parse_scores(result.content.strip())

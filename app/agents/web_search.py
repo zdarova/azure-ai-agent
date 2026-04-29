@@ -17,7 +17,7 @@ def _get_llm():
             model=os.environ["AZURE_AI_CHAT_DEPLOYMENT"],
             api_key=os.environ["AZURE_AI_KEY"],
             base_url=os.environ["AZURE_AI_ENDPOINT"],
-            temperature=0.3, max_tokens=2048,
+            temperature=0.3, max_tokens=1024,
         )
     return _llm
 
@@ -52,7 +52,7 @@ def web_search(state: AgentState) -> AgentState:
     if "Nuova domanda:" in question:
         question = question.split("Nuova domanda:")[-1].strip()
 
-    results = _search_ddg(question)
+    results = _search_ddg(question, max_results=3)
 
     if not results:
         search_text = "Nessun risultato trovato dalla ricerca web."

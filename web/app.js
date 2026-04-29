@@ -46,6 +46,30 @@ function stopVoice() {
 let _ttsUtterance = null;
 let _ttsAudio = null;
 
+function cleanForSpeech(md) {
+    let t = md;
+    t = t.replace(/```[\s\S]*?```/g, '');           // code blocks
+    t = t.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');  // [text](url) → text
+    t = t.replace(/https?:\/\/\S+/g, '');            // bare URLs
+    t = t.replace(/^#{1,4}\s+/gm, '');               // heading markers
+    t = t.replace(/\*\*(.+?)\*\*/g, '$1');            // **bold**
+    t = t.replace(/\*(.+?)\*/g, '$1');                // *italic*
+    t = t.replace(/^[-*•▸]\s+/gm, '');               // bullet markers
+    t = t.replace(/^\d+[\.\)]\s+/gm, '');            // numbered list markers
+    t = t.replace(/^\|.*\|$/gm, '');                  // table rows
+    t = t.replace(/Fonti web:?/gi, '');                // source labels
+    t = t.replace(/---+/g, '');                       // horizontal rules
+    t = t.replace(/[`|~>]/g, '');                     // leftover markdown chars
+    t = t.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, ''); // emoji
+    t = t.replace(/[\u{1F000}-\u{1FFFF}\u{2702}-\u{27B0}]/gu, ''); // more emoji
+    t = t.replace(/\n{2,}/g, '. ');                   // paragraph breaks → pause
+    t = t.replace(/\n/g, ', ');                       // line breaks → short pause
+    t = t.replace(/\s{2,}/g, ' ');                    // collapse whitespace
+    t = t.replace(/[,.]\s*[,.]/g, '.');               // fix double punctuation
+    t = t.replace(/^[\s,.;:]+/, '');                  // trim leading punctuation
+    return t.trim();
+}
+
 function _stopTTS(btn) {
     if (_ttsUtterance) { speechSynthesis.cancel(); _ttsUtterance = null; }
     if (_ttsAudio) { _ttsAudio.pause(); _ttsAudio = null; }
@@ -74,10 +98,11 @@ async function playTTS(btn) {
 
     // Fallback: browser Web Speech API
     if ('speechSynthesis' in window) {
-        const clean = text.replace(/[#*`|]/g, '').replace(/---/g, '').substring(0, 3000);
+        const clean = cleanForSpeech(text).substring(0, 3000);
         _ttsUtterance = new SpeechSynthesisUtterance(clean);
         _ttsUtterance.lang = 'it-IT';
-        _ttsUtterance.rate = 1.05;
+        _ttsUtterance.rate = 0.95;
+        _ttsUtterance.pitch = 1.0;
         _ttsUtterance.onend = () => _stopTTS(btn);
         _ttsUtterance.onerror = () => _stopTTS(btn);
         speechSynthesis.speak(_ttsUtterance);
@@ -411,7 +436,7 @@ async function send() {
                             _rawMarkdown[mid] = { title: agentLabel, markdown: rawMd };
 
                             // Clean text for TTS (strip markdown syntax)
-                            const ttsText = rawMd.replace(/```[\s\S]*?```/g, '').replace(/[#*`|]/g, '').replace(/---/g, ' ').replace(/\s+/g, ' ').trim();
+                            const ttsText = cleanForSpeech(rawMd);
 
                             const actions = document.createElement('div');
                             actions.className = 'feedback-row';

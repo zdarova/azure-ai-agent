@@ -1,5 +1,6 @@
 """LangGraph multi-agent graph with Send fan-out for multi-route support."""
 
+import threading
 from langgraph.graph import StateGraph, END, START
 from langgraph.types import Send
 from agents import AgentState
@@ -46,11 +47,11 @@ def guardrails_node(state: AgentState) -> AgentState:
             "pii_detected": guard["pii_detected"],
         }
 
-    # Enrich question with conversation history
-    history = get_history(state["session_id"])
+    # Enrich question with conversation history (keep concise)
+    history = get_history(state["session_id"], limit=2)
     history_ctx = "\n".join(
-        f"User: {h.get('question','')}\nAssistant: {h.get('response','')[:200]}"
-        for h in history[-3:] if h.get('question')
+        f"User: {h.get('question','')}\nAssistant: {h.get('response','')[:100]}"
+        for h in history[-2:] if h.get('question')
     ) if history else ""
 
     question = state["question"]
@@ -104,32 +105,35 @@ def merge_node(state: AgentState) -> AgentState:
 
 
 def memory_node(state: AgentState) -> AgentState:
-    """Extract and save long-term memory facts."""
-    try:
-        routes = state.get("routes", ["rag"])
-        facts = extract_facts(state["question"], state["response"], ",".join(routes))
-        if facts:
-            save_memories(state["session_id"], facts)
-    except Exception:
-        pass
+    """Extract and save long-term memory facts + persist turn — fire-and-forget."""
+    def _background():
+        try:
+            routes = state.get("routes", ["rag"])
+            facts = extract_facts(state["question"], state["response"], ",".join(routes))
+            if facts:
+                save_memories(state["session_id"], facts)
+        except Exception:
+            pass
+        # Also persist turn here (was a separate node)
+        if not state.get("pii_detected"):
+            try:
+                routes = state.get("routes", ["rag"])
+                save_turn(
+                    session_id=state["session_id"],
+                    question=state["question"],
+                    route=",".join(routes),
+                    reasoning=state.get("reasoning", ""),
+                    response=state["response"],
+                    quality=state.get("quality"),
+                )
+            except Exception:
+                pass
+    threading.Thread(target=_background, daemon=True).start()
     return {}
 
 
 def persist_node(state: AgentState) -> AgentState:
-    """Save conversation turn to Cosmos DB (skip if PII detected)."""
-    if not state.get("pii_detected"):
-        try:
-            routes = state.get("routes", ["rag"])
-            save_turn(
-                session_id=state["session_id"],
-                question=state["question"],
-                route=",".join(routes),
-                reasoning=state.get("reasoning", ""),
-                response=state["response"],
-                quality=state.get("quality"),
-            )
-        except Exception:
-            pass
+    """No-op — persist is now handled in memory_node background thread."""
     return {}
 
 

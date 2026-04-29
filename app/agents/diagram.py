@@ -17,7 +17,7 @@ def _get_llm():
             model=os.environ["AZURE_AI_CHAT_DEPLOYMENT"],
             api_key=os.environ["AZURE_AI_KEY"],
             base_url=os.environ["AZURE_AI_ENDPOINT"],
-            temperature=0.2, max_tokens=2048,
+            temperature=0.2, max_tokens=1024,
         )
     return _llm
 

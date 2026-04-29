@@ -36,6 +36,6 @@ def _get_vectorstore():
 
 @track("retriever")
 def retrieve(state: AgentState) -> AgentState:
-    docs = _get_vectorstore().similarity_search(state["question"], k=4)
+    docs = _get_vectorstore().similarity_search(state["question"], k=3)
     context = "\n\n".join(d.page_content for d in docs)
     return {**state, "context": context}
