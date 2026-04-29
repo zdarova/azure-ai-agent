@@ -73,7 +73,7 @@ async function exportPPTX() {
         // Get text content, skip quality/trace/feedback elements
         const clone = bub.cloneNode(true);
         clone.querySelectorAll('.quality-bar, .trace-bar, .feedback-row, .diagram-controls, .tts-btn, .pptx-btn').forEach(e => e.remove());
-        const text = clone.innerText.trim();
+        const text = (clone.textContent || '').replace(/\s+/g, ' ').trim();
         if (text.length > 20) slides.push({ title: `${agent}`, content: text.substring(0, 4000) });
     });
     if (!slides.length) { alert('Nessun contenuto da esportare.'); return; }
@@ -88,7 +88,7 @@ async function exportPPTX() {
 async function exportSlidePPTX(btn) {
     const title = btn.dataset.pptxTitle || 'AI';
     const text = btn.dataset.pptxText || '';
-    if (!text) return;
+    if (!text) { alert('Nessun testo da esportare (dataset vuoto).'); return; }
     try {
         const res = await fetch(BASE + '/api/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slides: [{ title, content: text.substring(0, 4000) }] }) });
         if (!res.ok) { alert('Errore generazione PPTX'); return; }
@@ -381,10 +381,10 @@ async function send() {
                         }
                         else if (ev === 'done') {
                             hl(null);
-                            // Get clean text for TTS/PPTX
+                            // Get clean text for TTS/PPTX — use textContent (layout-independent)
                             const cleanClone = bub.cloneNode(true);
-                            cleanClone.querySelectorAll('.quality-bar, .trace-bar, .feedback-row, .diagram-controls, .agent-badge, .reasoning-box, .warning-box').forEach(e => e.remove());
-                            const cleanText = cleanClone.innerText.trim();
+                            cleanClone.querySelectorAll('.quality-bar, .trace-bar, .feedback-row, .diagram-controls, .agent-badge, .reasoning-box, .warning-box, .typing').forEach(e => e.remove());
+                            const cleanText = (cleanClone.textContent || '').replace(/\s+/g, ' ').trim();
                             const agentLabel = routes.join(' + ');
 
                             const actions = document.createElement('div');
